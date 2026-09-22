@@ -1,0 +1,191 @@
+// 1. СОСТОЯНИЕ
+let currentInput = '';        // что вводим сейчас
+let previousInput = '';       // предыдущее число
+let operation = null;         // '+', '-', '*', '/'
+let shouldResetDisplay = false;
+
+let history = [];
+const STORAGE_KEY = 'calculatorHistory';
+
+// 2. ОТОБРАЖЕНИЕ ОПЕРАЦИЙ
+const OP_DISPLAY = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+
+// 3. DOM
+const resultDisplay = document.getElementById('resultDisplay');
+const historyDisplay = document.getElementById('historyDisplay');
+const historyContainer = document.getElementById('historyContainer');
+
+// 4. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) history = JSON.parse(saved);
+}
+
+// 5. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function updateDisplay() {
+    resultDisplay.textContent = currentInput || '0';
+}
+
+// 6. РЕНДЕР ИСТОРИИ
+function renderHistory() {
+    if (history.length === 0) {
+        historyContainer.innerHTML = '<p>История пуста</p>';
+        return;
+    }
+
+    historyContainer.innerHTML = history.map(item => `
+        <div>
+            <span>${escapeHtml(item.expression)}</span>
+            <span>= ${escapeHtml(item.result)}</span>
+        </div>
+    `).join('');
+}
+
+// 7. ВВОД ЦИФР
+function appendNumber(num) {
+    if (shouldResetDisplay) {
+        currentInput = '';
+        shouldResetDisplay = false;
+    }
+    currentInput += num;
+    updateDisplay();
+}
+
+function appendDot() {
+    if (shouldResetDisplay) {
+        currentInput = '0.';
+        shouldResetDisplay = false;
+        updateDisplay();
+        return;
+    }
+    if (!currentInput.includes('.')) {
+        currentInput += '.';
+    }
+    updateDisplay();
+}
+
+// 8. ОПЕРАТОРЫ
+function appendOperator(op) {
+    if (currentInput === '') return;
+
+    // Если уже есть операция — сначала вычисляем
+    if (operation && !shouldResetDisplay) {
+        calculate();
+    }
+
+    previousInput = currentInput;
+    operation = op;
+    shouldResetDisplay = true;
+
+    historyDisplay.textContent = `${previousInput} ${OP_DISPLAY[op]} `;
+}
+
+// 9. ВЫЧИСЛЕНИЕ
+function calculate() {
+    if (!operation || previousInput === '') return;
+
+    const a = parseFloat(previousInput);
+    const b = parseFloat(currentInput);
+
+    if (isNaN(a) || isNaN(b)) {
+        clearAll();
+        return;
+    }
+
+    let result;
+    switch (operation) {
+        case '+': result = a + b; break;
+        case '-': result = a - b; break;
+        case '*': result = a * b; break;
+        case '/':
+            if (b === 0) {
+                alert('Деление на ноль!');
+                clearAll();
+                return;
+            }
+            result = a / b;
+            break;
+        default: return;
+    }
+
+    // Округление до 8 знаков
+    if (!Number.isInteger(result)) {
+        result = parseFloat(result.toFixed(8));
+    }
+
+    // Сохраняем в историю
+    const expression = `${previousInput} ${OP_DISPLAY[operation]} ${currentInput}`;
+    history.push({
+        expression: expression,
+        result: result.toString()
+    });
+    save();
+    renderHistory();
+
+    // Обновляем состояние
+    currentInput = result.toString();
+    previousInput = '';
+    operation = null;
+    shouldResetDisplay = true;
+    historyDisplay.textContent = '';
+    updateDisplay();
+}
+
+// 10. ОЧИСТКА
+function clearAll() {
+    currentInput = '';
+    previousInput = '';
+    operation = null;
+    shouldResetDisplay = false;
+    historyDisplay.textContent = '';
+    updateDisplay();
+}
+
+function clearHistory() {
+    if (history.length === 0) return;
+    if (!confirm('Очистить историю?')) return;
+    history = [];
+    save();
+    renderHistory();
+}
+
+// 11. КЛАВИАТУРА
+function handleKeyboard(e) {
+    const key = e.key;
+
+    if (key >= '0' && key <= '9') {
+        appendNumber(key);
+    } else if (['+', '-', '*', '/'].includes(key)) {
+        appendOperator(key);
+    } else if (key === '.') {
+        appendDot();
+    } else if (key === 'Enter' || key === '=') {
+        calculate();
+    } else if (key === 'Escape') {
+        clearAll();
+    } else if (key === 'Backspace') {
+        currentInput = currentInput.slice(0, -1);
+        updateDisplay();
+    }
+}
+
+// 12. INIT
+function init() {
+    load();
+    renderHistory();
+    updateDisplay();
+
+    document.addEventListener('keydown', handleKeyboard);
+}
+
+document.addEventListener('DOMContentLoaded', init);
