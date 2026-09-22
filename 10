@@ -1,0 +1,159 @@
+// 1. ДАННЫЕ
+let recipes = [];
+let editingId = null;
+const STORAGE_KEY = 'cookbook';
+
+// 2. DOM
+const recipesContainer = document.getElementById('recipesContainer');
+const recipeForm = document.getElementById('recipeForm');
+const showFormBtn = document.getElementById('showFormBtn');
+const saveRecipeBtn = document.getElementById('saveRecipeBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+
+const recipeName = document.getElementById('recipeName');
+const recipeIngredients = document.getElementById('recipeIngredients');
+const recipeSteps = document.getElementById('recipeSteps');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) recipes = JSON.parse(saved);
+}
+
+// 4. УТИЛИТЫ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+}
+
+// 5. РЕНДЕР
+function render() {
+    if (recipes.length === 0) {
+        recipesContainer.innerHTML = '<p>Нет рецептов</p>';
+        return;
+    }
+
+    recipesContainer.innerHTML = recipes.map((recipe, index) => `
+        <div>
+            <div>
+                <span>${escapeHtml(recipe.name)}</span>
+                <button onclick="editRecipe(${index})">✏️</button>
+                <button onclick="deleteRecipe(${index})">🗑️</button>
+            </div>
+            <div>Ингредиенты: ${escapeHtml(recipe.ingredients)}</div>
+            <div>Шаги: ${escapeHtml(recipe.steps)}</div>
+            <div>${formatDate(recipe.createdAt)}</div>
+        </div>
+    `).join('');
+}
+
+// 6. ФОРМА
+function showForm() {
+    recipeForm.style.display = 'block';
+    showFormBtn.style.display = 'none';
+    recipeName.focus();
+}
+
+function clearForm() {
+    recipeName.value = '';
+    recipeIngredients.value = '';
+    recipeSteps.value = '';
+    editingId = null;
+    saveRecipeBtn.textContent = 'Сохранить';
+    recipeForm.style.display = 'none';
+    showFormBtn.style.display = 'block';
+}
+
+function fillForm(recipe) {
+    recipeName.value = recipe.name;
+    recipeIngredients.value = recipe.ingredients;
+    recipeSteps.value = recipe.steps;
+}
+
+// 7. CRUD
+function saveRecipe() {
+    const name = recipeName.value.trim();
+    const ingredients = recipeIngredients.value.trim();
+    const steps = recipeSteps.value.trim();
+
+    // Валидация один раз для двух режимов
+    if (!name || !ingredients || !steps) {
+        alert('Заполните все поля!');
+        return;
+    }
+
+    if (editingId !== null) {
+        // Обновляем
+        recipes[editingId] = {
+            ...recipes[editingId],
+            name: name,
+            ingredients: ingredients,
+            steps: steps
+        };
+    } else {
+        // Добавляем
+        recipes.push({
+            id: Date.now().toString(),
+            name: name,
+            ingredients: ingredients,
+            steps: steps,
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    save();
+    render();
+    clearForm();
+}
+
+function editRecipe(index) {
+    const recipe = recipes[index];
+    if (!recipe) return;
+
+    editingId = index;
+    fillForm(recipe);
+    saveRecipeBtn.textContent = 'Обновить';
+    recipeForm.style.display = 'block';
+    showFormBtn.style.display = 'none';
+    recipeName.focus();
+}
+
+function deleteRecipe(index) {
+    if (!confirm('Удалить рецепт?')) return;
+    recipes.splice(index, 1);
+    save();
+    render();
+}
+
+// 8. INIT
+function init() {
+    load();
+    render();
+
+    showFormBtn.addEventListener('click', showForm);
+    cancelBtn.addEventListener('click', clearForm);
+    saveRecipeBtn.addEventListener('click', saveRecipe);
+
+    // Ctrl+Enter для сохранения, если форма открыта
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            if (recipeForm.style.display === 'block') {
+                e.preventDefault();
+                saveRecipe();
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
