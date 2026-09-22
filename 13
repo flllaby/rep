@@ -1,0 +1,115 @@
+// 1. ДАННЫЕ
+let comments = [];
+const STORAGE_KEY = 'comments';
+
+// 2. DOM
+const commentsContainer = document.getElementById('commentsContainer');
+const userName = document.getElementById('userName');
+const commentText = document.getElementById('commentText');
+const addBtn = document.getElementById('addBtn');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(comments));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) comments = JSON.parse(saved);
+}
+
+// 4. УТИЛИТЫ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+// 5. РЕНДЕР
+function render() {
+    // Счётчик
+    const counter = `<div>Всего комментариев: ${comments.length}</div>`;
+
+    // Пусто
+    if (comments.length === 0) {
+        commentsContainer.innerHTML = counter + '<p>Нет комментариев</p>';
+        return;
+    }
+
+    // Сортируем от новых к старым
+    const sorted = [...comments].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    // Список
+    const list = sorted.map(c => {
+        const index = comments.indexOf(c);   // оригинальный индекс
+        return `
+            <div>
+                <div>
+                    <span>👤 ${escapeHtml(c.name)}</span>
+                    <span>${formatDate(c.createdAt)}</span>
+                </div>
+                <div>${escapeHtml(c.text)}</div>
+                <button onclick="deleteComment(${index})">✕</button>
+            </div>
+        `;
+    }).join('');
+
+    commentsContainer.innerHTML = counter + list;
+}
+
+// 6. ДОБАВЛЕНИЕ
+function addComment() {
+    const name = userName.value.trim();
+    const text = commentText.value.trim();
+
+    if (!name || !text) return;
+
+    comments.push({
+        id: Date.now().toString(),
+        name: name,
+        text: text,
+        createdAt: new Date().toISOString()
+    });
+
+    save();
+    render();
+
+    userName.value = '';
+    commentText.value = '';
+    userName.focus();
+}
+
+// 7. УДАЛЕНИЕ
+function deleteComment(index) {
+    if (!confirm('Удалить комментарий?')) return;
+    comments.splice(index, 1);
+    save();
+    render();
+}
+
+// 8. INIT
+function init() {
+    load();
+    render();
+
+    addBtn.addEventListener('click', addComment);
+
+    // Ctrl+Enter для отправки
+    commentText.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            addComment();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
