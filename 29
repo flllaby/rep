@@ -1,0 +1,154 @@
+// 1. ДАННЫЕ
+let books = [];
+let editingId = null;
+const STORAGE_KEY = 'bookshelf';
+
+// 2. DOM
+const bookTitle = document.getElementById('bookTitle');
+const bookAuthor = document.getElementById('bookAuthor');
+const bookStatus = document.getElementById('bookStatus');
+const bookRating = document.getElementById('bookRating');
+const addBtn = document.getElementById('addBtn');
+const booksContainer = document.getElementById('booksContainer');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) books = JSON.parse(saved);
+}
+
+// 4. УТИЛИТЫ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getStatusClass(status) {
+    const map = {
+        'Прочитано': 'status-read',
+        'Читаю': 'status-reading',
+        'Хочу прочитать': 'status-want',
+        'Брошено': 'status-dropped'
+    };
+    return map[status] || '';
+}
+
+function getStars(rating) {
+    const n = rating || 0;
+    return '⭐'.repeat(n) + '☆'.repeat(5 - n);
+}
+
+// 5. ФОРМА
+function clearForm() {
+    bookTitle.value = '';
+    bookAuthor.value = '';
+    bookStatus.value = 'Прочитано';
+    bookRating.value = '';
+    editingId = null;
+    addBtn.textContent = 'Добавить';
+    bookTitle.focus();
+}
+
+function fillForm(book) {
+    bookTitle.value = book.title;
+    bookAuthor.value = book.author;
+    bookStatus.value = book.status;
+    bookRating.value = book.rating || '';
+}
+
+// 6. РЕНДЕР
+function render() {
+    if (books.length === 0) {
+        booksContainer.innerHTML = '<p>Нет книг</p>';
+        return;
+    }
+
+    booksContainer.innerHTML = books.map((book, index) => `
+        <div>
+            <span>${escapeHtml(book.title)}</span>
+            <span>${escapeHtml(book.author)}</span>
+            <span class="${getStatusClass(book.status)}">${escapeHtml(book.status)}</span>
+            <span>${getStars(book.rating)}</span>
+            <button onclick="editBook(${index})">✏️</button>
+            <button onclick="deleteBook(${index})">🗑️</button>
+        </div>
+    `).join('');
+}
+
+// 7. CRUD — одна функция на добавление и обновление
+function saveBook() {
+    const title = bookTitle.value.trim();
+    const author = bookAuthor.value.trim();
+    const status = bookStatus.value;
+    const rating = bookRating.value ? parseInt(bookRating.value) : null;
+
+    // Валидация
+    if (!title || !author) return;
+    if (rating !== null && (rating < 1 || rating > 5)) {
+        alert('Оценка от 1 до 5');
+        return;
+    }
+
+    // Дубликат (только при добавлении)
+    if (editingId === null) {
+        const isDuplicate = books.some(b =>
+            b.title.toLowerCase() === title.toLowerCase() &&
+            b.author.toLowerCase() === author.toLowerCase()
+        );
+        if (isDuplicate) {
+            alert('Такая книга уже есть');
+            return;
+        }
+    }
+
+    if (editingId !== null) {
+        // Обновляем
+        books[editingId] = {
+            ...books[editingId],
+            title, author, status, rating
+        };
+    } else {
+        // Добавляем
+        books.push({
+            id: Date.now().toString(),
+            title, author, status, rating
+        });
+    }
+
+    save();
+    render();
+    clearForm();
+}
+
+function editBook(index) {
+    const book = books[index];
+    if (!book) return;
+
+    editingId = index;
+    fillForm(book);
+    addBtn.textContent = 'Сохранить';
+    bookTitle.focus();
+}
+
+function deleteBook(index) {
+    if (!confirm('Удалить книгу?')) return;
+    books.splice(index, 1);
+    save();
+    render();
+
+    if (editingId === index) clearForm();
+}
+
+// 8. INIT
+function init() {
+    load();
+    render();
+    addBtn.addEventListener('click', saveBook);
+}
+
+document.addEventListener('DOMContentLoaded', init);
