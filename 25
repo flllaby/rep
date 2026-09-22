@@ -1,0 +1,153 @@
+// 1. ДАННЫЕ
+let products = [];
+const STORAGE_KEY = 'products';
+const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23dfe6e9"/%3E%3Ctext x="100" y="110" text-anchor="middle" font-size="40" fill="%23999"%3E📦%3C/text%3E%3C/svg%3E';
+
+// 2. DOM
+const productName = document.getElementById('productName');
+const productImage = document.getElementById('productImage');
+const addBtn = document.getElementById('addBtn');
+const productsContainer = document.getElementById('productsContainer');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) products = JSON.parse(saved);
+}
+
+// 4. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 5. СРЕДНЯЯ ОЦЕНКА
+function getAverage(ratings) {
+    if (ratings.length === 0) return 0;
+    const sum = ratings.reduce((s, r) => s + r, 0);
+    return sum / ratings.length;
+}
+
+// 6. ЗВЁЗДЫ
+function renderStars(productId, ratings) {
+    let html = '';
+
+    for (let i = 1; i <= 5; i++) {
+        const active = ratings.includes(i);
+        html += `
+            <button onclick="rateProduct('${productId}', ${i})">
+                ${active ? '⭐' : '☆'}
+            </button>
+        `;
+    }
+
+    return html;
+}
+
+// 7. РЕНДЕР
+function render() {
+    if (products.length === 0) {
+        productsContainer.innerHTML = '<p>Нет товаров</p>';
+        return;
+    }
+
+    productsContainer.innerHTML = products.map(product => {
+        const avg = getAverage(product.ratings);
+        const displayAvg = avg > 0 ? avg.toFixed(1) : '—';
+
+        return `
+            <div>
+                <img src="${escapeHtml(product.image) || PLACEHOLDER}"
+                     alt="${escapeHtml(product.name)}"
+                     onerror="this.src='${PLACEHOLDER}'">
+                <div>${escapeHtml(product.name)}</div>
+                <div>
+                    ${renderStars(product.id, product.ratings)}
+                    ${displayAvg} (${product.ratings.length})
+                </div>
+                <button onclick="resetRatings('${product.id}')">Сброс</button>
+                <button onclick="deleteProduct('${product.id}')">Удалить</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// 8. ОЦЕНКА
+function rateProduct(productId, rating) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const pos = product.ratings.indexOf(rating);
+
+    if (pos !== -1) {
+        // Уже есть → убрать
+        product.ratings.splice(pos, 1);
+    } else {
+        // Нет → добавить
+        product.ratings.push(rating);
+    }
+
+    save();
+    render();
+}
+
+// 9. СБРОС
+function resetRatings(productId) {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    if (!confirm('Сбросить все оценки?')) return;
+
+    product.ratings = [];
+    save();
+    render();
+}
+
+// 10. УДАЛЕНИЕ
+function deleteProduct(productId) {
+    if (!confirm('Удалить товар?')) return;
+    products = products.filter(p => p.id !== productId);
+    save();
+    render();
+}
+
+// 11. ДОБАВЛЕНИЕ
+function addProduct() {
+    const name = productName.value.trim();
+    const image = productImage.value.trim();
+
+    if (!name) return;
+
+    // Дубликат?
+    if (products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+        alert('Такой товар уже есть');
+        return;
+    }
+
+    products.push({
+        id: Date.now().toString(),
+        name: name,
+        image: image,
+        ratings: []
+    });
+
+    save();
+    render();
+
+    productName.value = '';
+    productImage.value = '';
+    productName.focus();
+}
+
+// 12. INIT
+function init() {
+    load();
+    render();
+    addBtn.addEventListener('click', addProduct);
+}
+
+document.addEventListener('DOMContentLoaded', init);
