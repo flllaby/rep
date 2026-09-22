@@ -1,0 +1,100 @@
+// 1. КОНСТАНТЫ
+const STORAGE_KEY = 'notebookContent';
+const AUTO_SAVE_INTERVAL = 5000;   // 5 секунд
+const DEBOUNCE_DELAY = 1000;        // 1 секунда после последнего ввода
+
+// 2. DOM
+const noteContent = document.getElementById('noteContent');
+const saveStatus = document.getElementById('saveStatus');
+const wordCount = document.getElementById('wordCount');
+const charCount = document.getElementById('charCount');
+const lastSaveTimeEl = document.getElementById('lastSaveTime');
+
+// 3. СОСТОЯНИЕ
+let saveTimeout = null;
+let lastSavedContent = '';
+let lastSaveTime = null;
+
+// 4. LOCALSTORAGE
+function save(content) {
+    localStorage.setItem(STORAGE_KEY, content);
+    lastSaveTime = new Date();
+    lastSavedContent = content;
+}
+
+function load() {
+    return localStorage.getItem(STORAGE_KEY) || '';
+}
+
+// 5. СТАТИСТИКА
+function getWordCount(text) {
+    return text.trim() ? text.trim().split(/\s+/).length : 0;
+}
+
+function updateStats() {
+    const text = noteContent.value;
+    wordCount.textContent = `Слов: ${getWordCount(text)}`;
+    charCount.textContent = `Символов: ${text.length}`;
+}
+
+function updateSaveStatus(text) {
+    saveStatus.textContent = text;
+}
+
+function updateLastSaveTime() {
+    if (!lastSaveTime) {
+        lastSaveTimeEl.textContent = '—';
+        return;
+    }
+    lastSaveTimeEl.textContent = lastSaveTime.toLocaleTimeString('ru-RU');
+}
+
+// 6. СОХРАНЕНИЕ
+function saveContent() {
+    const content = noteContent.value;
+    if (content === lastSavedContent) return;
+
+    save(content);
+    updateSaveStatus('✅ Сохранено');
+    updateLastSaveTime();
+}
+
+// 7. ОБРАБОТКА ВВОДА
+function onInput() {
+    updateStats();
+    updateSaveStatus('✏️ Редактирование...');
+
+    // Debounce: сохраняем через 1 секунду после последнего ввода
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveContent, DEBOUNCE_DELAY);
+}
+
+// 8. INIT
+function init() {
+    // Загружаем текст
+    const saved = load();
+    noteContent.value = saved;
+    lastSavedContent = saved;
+
+    updateStats();
+    updateSaveStatus('Загружено');
+    updateLastSaveTime();
+
+    // Автосохранение каждые 5 секунд
+    setInterval(saveContent, AUTO_SAVE_INTERVAL);
+
+    // Сохранение после ввода (debounce)
+    noteContent.addEventListener('input', onInput);
+
+    // Ctrl+S — сохранить вручную
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveContent();
+        }
+    });
+
+    noteContent.focus();
+}
+
+document.addEventListener('DOMContentLoaded', init);
