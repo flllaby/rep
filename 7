@@ -1,0 +1,178 @@
+// 1. ДАННЫЕ — урезал до 10 стран
+const countries = [
+    { name: 'Россия', flag: '🇷🇺' },
+    { name: 'США', flag: '🇺🇸' },
+    { name: 'Франция', flag: '🇫🇷' },
+    { name: 'Германия', flag: '🇩🇪' },
+    { name: 'Италия', flag: '🇮🇹' },
+    { name: 'Испания', flag: '🇪🇸' },
+    { name: 'Япония', flag: '🇯🇵' },
+    { name: 'Китай', flag: '🇨🇳' },
+    { name: 'Бразилия', flag: '🇧🇷' },
+    { name: 'Канада', flag: '🇨🇦' }
+];
+
+// 2. СОСТОЯНИЕ
+let game = {};
+
+// 3. DOM
+const flagDisplay = document.getElementById('flagDisplay');
+const optionsContainer = document.getElementById('optionsContainer');
+const resultMessage = document.getElementById('resultMessage');
+const nextBtn = document.getElementById('nextBtn');
+const gameArea = document.getElementById('gameArea');
+const gameOver = document.getElementById('gameOver');
+const scoreDisplay = document.getElementById('score');
+const questionNumDisplay = document.getElementById('questionNum');
+const totalQuestionsDisplay = document.getElementById('totalQuestions');
+const finalScoreDisplay = document.getElementById('finalScore');
+const restartBtn = document.getElementById('restartBtn');
+
+// 4. LOCALSTORAGE
+function save() {
+    localStorage.setItem('flagGame', JSON.stringify(game));
+}
+
+function load() {
+    const saved = localStorage.getItem('flagGame');
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+            if (data.questions && data.questions.length > 0) {
+                game = data;
+                return true;
+            }
+        } catch (e) {}
+    }
+    return false;
+}
+
+// 5. ГЕНЕРАЦИЯ ВОПРОСОВ
+function generateQuestions() {
+    // 8 случайных стран
+    const shuffled = [...countries].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, 8);
+
+    return selected.map(country => {
+        // 3 случайных неправильных варианта
+        const wrong = countries
+            .filter(c => c.name !== country.name)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3)
+            .map(c => c.name);
+
+        // Собираем варианты и перемешиваем
+        const options = [country.name, ...wrong]
+            .sort(() => Math.random() - 0.5);
+
+        return {
+            country: country,
+            options: options,
+            correctName: country.name   // просто имя правильного
+        };
+    });
+}
+
+// 6. ПОКАЗАТЬ ВОПРОС
+function showQuestion() {
+    if (game.current >= game.questions.length) {
+        showGameOver();
+        return;
+    }
+
+    const q = game.questions[game.current];
+
+    // Флаг
+    flagDisplay.textContent = q.country.flag;
+
+    // Статистика
+    scoreDisplay.textContent = game.score;
+    questionNumDisplay.textContent = game.current + 1;
+    totalQuestionsDisplay.textContent = game.questions.length;
+
+    // Варианты
+    optionsContainer.innerHTML = '';
+    q.options.forEach(name => {
+        const btn = document.createElement('button');
+        btn.textContent = name;
+        btn.addEventListener('click', () => handleAnswer(btn, q.correctName));
+        optionsContainer.appendChild(btn);
+    });
+
+    // Сброс
+    game.answered = false;
+    resultMessage.textContent = '';
+    nextBtn.style.display = 'none';
+    gameOver.style.display = 'none';
+    gameArea.style.display = 'block';
+
+    save();
+}
+
+// 7. ОТВЕТ
+function handleAnswer(btn, correctName) {
+    if (game.answered) return;
+    game.answered = true;
+
+    const isCorrect = btn.textContent === correctName;
+    const allBtns = optionsContainer.querySelectorAll('button');
+
+    // Блокируем и подсвечиваем правильный
+    allBtns.forEach(b => {
+        b.disabled = true;
+        if (b.textContent === correctName) b.classList.add('correct');
+    });
+
+    if (isCorrect) {
+        game.score++;
+        scoreDisplay.textContent = game.score;
+        resultMessage.textContent = '✅ Правильно!';
+    } else {
+        btn.classList.add('wrong');
+        resultMessage.textContent = '❌ Неправильно!';
+    }
+
+    nextBtn.style.display = 'block';
+    save();
+}
+
+// 8. СЛЕДУЮЩИЙ
+function nextQuestion() {
+    game.current++;
+    save();
+    showQuestion();
+}
+
+// 9. КОНЕЦ ИГРЫ
+function showGameOver() {
+    gameArea.style.display = 'none';
+    gameOver.style.display = 'block';
+    finalScoreDisplay.textContent = game.score;
+    save();
+}
+
+// 10. РЕСТАРТ
+function restartGame() {
+    game = {
+        questions: generateQuestions(),
+        current: 0,
+        score: 0,
+        answered: false
+    };
+    localStorage.removeItem('flagGame');
+    showQuestion();
+}
+
+// 11. INIT
+function init() {
+    if (!load() || game.current >= game.questions.length) {
+        restartGame();
+    } else {
+        showQuestion();
+    }
+
+    nextBtn.addEventListener('click', nextQuestion);
+    restartBtn.addEventListener('click', restartGame);
+}
+
+document.addEventListener('DOMContentLoaded', init);
