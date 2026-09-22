@@ -1,0 +1,108 @@
+// 1. ДАННЫЕ
+let cards = [];
+const STORAGE_KEY = 'cards';
+
+// 2. DOM
+const nameInput = document.getElementById('name');
+const jobInput = document.getElementById('job');
+const phoneInput = document.getElementById('phone');
+const colorInput = document.getElementById('color');
+const saveBtn = document.getElementById('saveBtn');
+
+const previewName = document.getElementById('previewName');
+const previewJob = document.getElementById('previewJob');
+const previewPhone = document.getElementById('previewPhone');
+const cardPreview = document.getElementById('cardPreview');
+
+const cardsContainer = document.getElementById('cardsContainer');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) cards = JSON.parse(saved);
+}
+
+// 4. ПРЕВЬЮ
+function updatePreview() {
+    previewName.textContent = nameInput.value || 'Иван Петров';
+    previewJob.textContent = jobInput.value || 'Разработчик';
+    previewPhone.textContent = phoneInput.value || '+7 999 123-45-67';
+    cardPreview.style.background = colorInput.value || '#4CAF50';
+}
+
+// 5. РЕНДЕР
+function renderCards() {
+    if (cards.length === 0) {
+        cardsContainer.innerHTML = '<p>Нет визиток</p>';
+        return;
+    }
+
+    cardsContainer.innerHTML = cards.map(card => `
+        <div style="background: ${card.color}">
+            <div>${escapeHtml(card.name)}</div>
+            <div>${escapeHtml(card.job)}</div>
+            <div>${escapeHtml(card.phone)}</div>
+            <button onclick="deleteCard('${card.id}')">Удалить</button>
+        </div>
+    `).join('');
+}
+
+// 6. CRUD
+function saveCard() {
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    cards.push({
+        id: Date.now().toString(),
+        name: name,
+        job: jobInput.value.trim() || 'Не указано',
+        phone: phoneInput.value.trim() || 'Не указан',
+        color: colorInput.value || '#4CAF50'
+    });
+
+    save();
+    renderCards();
+
+    // Очистка
+    nameInput.value = '';
+    jobInput.value = '';
+    phoneInput.value = '';
+    colorInput.value = '#4CAF50';
+    updatePreview();
+}
+
+function deleteCard(id) {
+    if (!confirm('Удалить визитку?')) return;
+    cards = cards.filter(c => c.id !== id);
+    save();
+    renderCards();
+}
+
+// 7. ВСПОМОГАТЕЛЬНАЯ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 8. INIT
+function init() {
+    load();
+    renderCards();
+    updatePreview();
+
+    // Живое превью
+    nameInput.addEventListener('input', updatePreview);
+    jobInput.addEventListener('input', updatePreview);
+    phoneInput.addEventListener('input', updatePreview);
+    colorInput.addEventListener('input', updatePreview);
+
+    // Сохранение
+    saveBtn.addEventListener('click', saveCard);
+}
+
+document.addEventListener('DOMContentLoaded', init);
