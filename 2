@@ -1,0 +1,126 @@
+// 1. ДАННЫЕ
+const products = [
+    { id: 1, name: 'Ноутбук',    price: 50000 },
+    { id: 2, name: 'Телефон',    price: 30000 },
+    { id: 3, name: 'Наушники',   price: 5000 },
+    { id: 4, name: 'Клавиатура', price: 3000 },
+    { id: 5, name: 'Мышь',       price: 1500 },
+    { id: 6, name: 'Монитор',    price: 25000 }
+];
+
+let cart = [];
+const STORAGE_KEY = 'cart';
+
+// 2. DOM
+const productList = document.getElementById('productList');
+const cartList = document.getElementById('cartList');
+const cartCount = document.getElementById('cartCount');
+const cartTotal = document.getElementById('cartTotal');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) cart = JSON.parse(saved);
+}
+
+// 4. РЕНДЕР ТОВАРОВ
+function renderProducts() {
+    productList.innerHTML = products.map(product => {
+        const inCart = cart.find(i => i.id === product.id);
+        const count = inCart ? inCart.count : 0;
+
+        return `
+            <div>
+                <h3>${product.name}</h3>
+                <div>${product.price} ₽</div>
+                <button onclick="addToCart(${product.id})">В корзину</button>
+                ${count > 0 ? `<span> (в корзине: ${count})</span>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// 5. РЕНДЕР КОРЗИНЫ
+function renderCart() {
+    if (cart.length === 0) {
+        cartList.innerHTML = '<p>Корзина пуста</p>';
+        cartCount.textContent = 0;
+        cartTotal.textContent = 0;
+        return;
+    }
+
+    let totalItems = 0;
+    let totalPrice = 0;
+
+    cartList.innerHTML = cart.map(item => {
+        const product = products.find(p => p.id === item.id);
+        const itemTotal = product.price * item.count;
+
+        totalItems += item.count;
+        totalPrice += itemTotal;
+
+        return `
+            <div>
+                <div>${product.name}</div>
+                <div>${product.price} ₽ × ${item.count} = ${itemTotal} ₽</div>
+                <button onclick="changeCount(${item.id}, -1)">−</button>
+                <span>${item.count}</span>
+                <button onclick="changeCount(${item.id}, 1)">+</button>
+                <button onclick="removeFromCart(${item.id})">✖</button>
+            </div>
+        `;
+    }).join('');
+
+    cartCount.textContent = totalItems;
+    cartTotal.textContent = totalPrice;
+}
+
+// 6. ОПЕРАЦИИ
+function addToCart(productId) {
+    const existing = cart.find(i => i.id === productId);
+
+    if (existing) {
+        existing.count += 1;
+    } else {
+        cart.push({ id: productId, count: 1 });
+    }
+
+    save();
+    renderProducts();
+    renderCart();
+}
+
+function changeCount(productId, delta) {
+    const item = cart.find(i => i.id === productId);
+    if (!item) return;
+
+    item.count += delta;
+
+    if (item.count <= 0) {
+        cart = cart.filter(i => i.id !== productId);
+    }
+
+    save();
+    renderProducts();
+    renderCart();
+}
+
+function removeFromCart(productId) {
+    cart = cart.filter(i => i.id !== productId);
+    save();
+    renderProducts();
+    renderCart();
+}
+
+// 7. INIT
+function init() {
+    load();
+    renderProducts();
+    renderCart();
+}
+
+document.addEventListener('DOMContentLoaded', init);
