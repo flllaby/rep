@@ -1,0 +1,96 @@
+// 1. ДАННЫЕ — ОДИН ОБЪЕКТ, НЕ МАССИВ
+let profile = {
+    name: '',
+    avatar: '',
+    birthday: '',
+    theme: 'light'
+};
+
+const STORAGE_KEY = 'profile';
+
+// 2. DOM
+const nameInput = document.getElementById('name');
+const avatarInput = document.getElementById('avatar');
+const birthdayInput = document.getElementById('birthday');
+const themeSelect = document.getElementById('theme');
+const saveBtn = document.getElementById('saveBtn');
+
+const previewName = document.getElementById('previewName');
+const previewAvatar = document.getElementById('previewAvatar');
+const previewBirthday = document.getElementById('previewBirthday');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) profile = JSON.parse(saved);
+}
+
+// 4. ЗАГРУЗКА В ФОРМУ
+function loadForm() {
+    nameInput.value = profile.name || '';
+    avatarInput.value = profile.avatar || '';
+    birthdayInput.value = profile.birthday || '';
+    themeSelect.value = profile.theme || 'light';
+}
+
+// 5. ПРЕВЬЮ
+function updatePreview() {
+    // Имя
+    previewName.textContent = nameInput.value.trim() || 'Имя не указано';
+
+    // Аватар
+    const avatar = avatarInput.value.trim();
+    if (avatar) {
+        previewAvatar.src = avatar;
+        previewAvatar.alt = 'Аватар';
+    } else {
+        previewAvatar.src = 'data:image/svg+xml,...';   // тот же SVG
+        previewAvatar.alt = 'Нет аватара';
+    }
+
+    // Дата рождения
+    const birthday = birthdayInput.value;
+    if (birthday) {
+        const date = new Date(birthday + 'T00:00:00');
+        previewBirthday.textContent = date.toLocaleDateString('ru-RU', {
+            day: 'numeric', month: 'long', year: 'numeric'
+        });
+    } else {
+        previewBirthday.textContent = 'Дата рождения не указана';
+    }
+
+    // Тема — сразу применяем к body
+    document.body.className = themeSelect.value;
+}
+
+// 6. СОХРАНЕНИЕ
+function saveProfile() {
+    profile.name = nameInput.value.trim();
+    profile.avatar = avatarInput.value.trim();
+    profile.birthday = birthdayInput.value;
+    profile.theme = themeSelect.value;
+
+    save();
+    updatePreview();
+}
+
+// 7. INIT
+function init() {
+    load();
+    loadForm();
+    updatePreview();
+
+    // Живое превью
+    nameInput.addEventListener('input', updatePreview);
+    avatarInput.addEventListener('input', updatePreview);
+    birthdayInput.addEventListener('input', updatePreview);
+    themeSelect.addEventListener('change', updatePreview);
+
+    saveBtn.addEventListener('click', saveProfile);
+}
+
+document.addEventListener('DOMContentLoaded', init);
