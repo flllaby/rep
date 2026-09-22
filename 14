@@ -1,0 +1,131 @@
+// 1. ДАННЫЕ
+let blockedSites = [];
+const STORAGE_KEY = 'blockedSites';
+
+// 2. DOM
+const sitesContainer = document.getElementById('sitesContainer');
+const siteUrl = document.getElementById('siteUrl');
+const blockTime = document.getElementById('blockTime');
+const addBtn = document.getElementById('addBtn');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(blockedSites));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) blockedSites = JSON.parse(saved);
+}
+
+// 4. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 5. ОБНОВЛЕНИЕ ТАЙМЕРОВ
+function updateTimers() {
+    const now = Date.now();
+    let changed = false;
+
+    blockedSites.forEach(site => {
+        if (site.blockedUntil && now > site.blockedUntil) {
+            site.blockedUntil = null;
+            changed = true;
+        }
+    });
+
+    if (changed) save();
+    render();
+}
+
+// 6. РЕНДЕР
+function render() {
+    if (blockedSites.length === 0) {
+        sitesContainer.innerHTML = '<p>Нет заблокированных сайтов</p>';
+        return;
+    }
+
+    const now = Date.now();
+
+    sitesContainer.innerHTML = blockedSites.map((site, index) => {
+        // Активна ли блокировка?
+        const isBlocked = site.blockedUntil && site.blockedUntil > now;
+
+        // Сколько минут осталось?
+        let timeLeft;
+        if (isBlocked) {
+            const minutesLeft = Math.ceil((site.blockedUntil - now) / 60000);
+            timeLeft = `⏱ ${minutesLeft} мин.`;
+        } else {
+            timeLeft = '🟢 Не заблокирован';
+        }
+
+        return `
+            <div>
+                <div>🌐 ${escapeHtml(site.url)}</div>
+                <div>${timeLeft} | Блокировка: ${site.blockTime} мин.</div>
+                <button onclick="deleteSite(${index})">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// 7. ДОБАВЛЕНИЕ
+function addSite() {
+    let url = siteUrl.value.trim().toLowerCase();
+    const time = parseInt(blockTime.value);
+
+    if (!url) return;
+
+    // Очищаем URL: убираем http://, https://, www. и всё после /
+    url = url
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .split('/')[0];
+
+    if (!url) return;
+    if (!time || time < 1) return;
+
+    // Проверка дубликата
+    if (blockedSites.some(s => s.url === url)) {
+        alert('Этот сайт уже добавлен!');
+        return;
+    }
+
+    blockedSites.push({
+        id: Date.now().toString(),
+        url: url,
+        blockTime: time,
+        blockedUntil: Date.now() + time * 60000
+    });
+
+    save();
+    render();
+
+    siteUrl.value = '';
+    siteUrl.focus();
+}
+
+// 8. УДАЛЕНИЕ
+function deleteSite(index) {
+    if (!confirm('Удалить сайт?')) return;
+    blockedSites.splice(index, 1);
+    save();
+    render();
+}
+
+// 9. INIT
+function init() {
+    load();
+    updateTimers();   // сразу проверяем, не истекли ли таймеры
+
+    // Обновляем таймеры каждые 30 секунд
+    setInterval(updateTimers, 30000);
+
+    addBtn.addEventListener('click', addSite);
+}
+
+document.addEventListener('DOMContentLoaded', init);
