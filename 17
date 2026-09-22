@@ -1,0 +1,209 @@
+// 1. ДАННЫЕ
+let tasks = [];
+let activeTask = null;
+let timerInterval = null;
+let isPaused = false;
+
+// 2. КЛЮЧИ
+const KEY_TASKS = 'timeTrackerTasks';
+const KEY_ACTIVE = 'timeTrackerActive';
+
+// 3. DOM
+const taskNameInput = document.getElementById('taskName');
+const addBtn = document.getElementById('addBtn');
+const tasksContainer = document.getElementById('tasksContainer');
+const emptyMessage = document.getElementById('emptyMessage');
+const totalTasksSpan = document.getElementById('totalTasks');
+
+const activeSection = document.getElementById('activeSection');
+const activeTaskName = document.getElementById('activeTaskName');
+const activeTaskTime = document.getElementById('activeTaskTime');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+// 4. LOCALSTORAGE
+function saveTasks() {
+    localStorage.setItem(KEY_TASKS, JSON.stringify(tasks));
+}
+
+function loadTasks() {
+    const saved = localStorage.getItem(KEY_TASKS);
+    if (saved) tasks = JSON.parse(saved);
+}
+
+function saveActive() {
+    if (activeTask) {
+        localStorage.setItem(KEY_ACTIVE, JSON.stringify(activeTask));
+    } else {
+        localStorage.removeItem(KEY_ACTIVE);
+    }
+}
+
+function loadActive() {
+    const saved = localStorage.getItem(KEY_ACTIVE);
+    if (saved) activeTask = JSON.parse(saved);
+}
+
+// 5. ФОРМАТ ВРЕМЕНИ
+function formatTime(seconds) {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    return [hrs, mins, secs]
+        .map(v => String(v).padStart(2, '0'))
+        .join(':');
+}
+
+// 6. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 7. РЕНДЕР ИСТОРИИ
+function renderTasks() {
+    totalTasksSpan.textContent = tasks.length;
+
+    if (tasks.length === 0) {
+        tasksContainer.innerHTML = '';
+        emptyMessage.style.display = 'block';
+        return;
+    }
+
+    emptyMessage.style.display = 'none';
+
+    // Сортируем от новых к старым
+    const sorted = [...tasks].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    tasksContainer.innerHTML = sorted.map(task => {
+        const index = tasks.indexOf(task);   // оригинальный индекс
+        return `
+            <div>
+                <div>${escapeHtml(task.name)}</div>
+                <div>⏱ ${formatTime(task.totalTime)}</div>
+                <button onclick="deleteTask(${index})">Удалить</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// 8. РЕНДЕР АКТИВНОЙ ЗАДАЧИ
+function renderActive() {
+    if (!activeTask) {
+        activeSection.style.display = 'none';
+        return;
+    }
+
+    activeSection.style.display = 'block';
+    activeTaskName.textContent = activeTask.name;
+    activeTaskTime.textContent = formatTime(activeTask.currentTime);
+    pauseBtn.textContent = isPaused ? '▶ Продолжить' : '⏸ Пауза';
+}
+
+// 9. ТАЙМЕР
+function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+        if (isPaused || !activeTask) return;
+        activeTask.currentTime++;
+        activeTaskTime.textContent = formatTime(activeTask.currentTime);
+        saveActive();   // сохраняем прогресс каждую секунду
+    }, 1000);
+}
+
+function pauseTimer() {
+    if (!activeTask) return;
+    isPaused = !isPaused;
+    renderActive();
+    saveActive();
+}
+
+// 10. ДОБАВЛЕНИЕ
+function addTask() {
+    const name = taskNameInput.value.trim();
+    if (!name) return;
+
+    // Если была активная — останавливаем и сохраняем
+    if (activeTask) stopActiveTask();
+
+    // Создаём новую активную
+    activeTask = {
+        id: Date.now().toString(),
+        name: name,
+        currentTime: 0,
+        createdAt: new Date().toISOString()
+    };
+    isPaused = false;
+
+    saveActive();
+    renderActive();
+    startTimer();
+
+    taskNameInput.value = '';
+    taskNameInput.focus();
+}
+
+// 11. ОСТАНОВКА
+function stopActiveTask() {
+    if (!activeTask) return;
+
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    // Если успели что-то наработать — добавляем в историю
+    if (activeTask.currentTime > 0) {
+        tasks.push({
+            id: activeTask.id,
+            name: activeTask.name,
+            totalTime: activeTask.currentTime,
+            createdAt: activeTask.createdAt
+        });
+        saveTasks();
+        renderTasks();
+    }
+
+    activeTask = null;
+    isPaused = false;
+    saveActive();
+    renderActive();
+}
+
+// 12. УДАЛЕНИЕ
+function deleteTask(index) {
+    if (!confirm('Удалить задачу?')) return;
+    tasks.splice(index, 1);
+    saveTasks();
+    renderTasks();
+}
+
+// 13. INIT
+function init() {
+    loadTasks();
+    renderTasks();
+
+    loadActive();
+    renderActive();
+
+    // Если была активная задача — запускаем таймер
+    if (activeTask) startTimer();
+
+    addBtn.addEventListener('click', addTask);
+
+    taskNameInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') addTask();
+    });
+
+    pauseBtn.addEventListener('click', pauseTimer);
+
+    stopBtn.addEventListener('click', () => {
+        if (confirm('Остановить задачу?')) stopActiveTask();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
