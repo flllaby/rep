@@ -1,0 +1,228 @@
+// 1. ДАННЫЕ
+let currentStep = 0;
+const TOTAL_STEPS = 4;
+const STORAGE_KEY = 'multiStepForm';
+
+let formData = {
+    // Шаг 1
+    fullName: '', age: '', email: '', phone: '',
+    // Шаг 2
+    education: 'Среднее', profession: '', experience: '', company: '',
+    // Шаг 3
+    interests: [], aboutMe: ''
+};
+
+// 2. DOM
+const steps = document.querySelectorAll('.form-step');
+const progressFill = document.getElementById('progressFill');
+const progressSteps = document.querySelectorAll('.step');
+
+// Шаг 1
+const fullName = document.getElementById('fullName');
+const age = document.getElementById('age');
+const email = document.getElementById('email');
+const phone = document.getElementById('phone');
+
+// Шаг 2
+const education = document.getElementById('education');
+const profession = document.getElementById('profession');
+const experience = document.getElementById('experience');
+const company = document.getElementById('company');
+
+// Шаг 3
+const interestsCheckboxes = document.querySelectorAll('.checkbox-group input[type="checkbox"]');
+const aboutMe = document.getElementById('aboutMe');
+
+// Итог
+const summaryContainer = document.getElementById('summaryContainer');
+
+// 3. LOCALSTORAGE
+function saveProgress() {
+    const data = { currentStep, formData };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadProgress() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    const data = JSON.parse(saved);
+    currentStep = data.currentStep || 0;
+    formData = data.formData || formData;
+}
+
+// 4. ЧТЕНИЕ И ЗАПИСЬ ФОРМЫ
+function saveFieldData() {
+    // Шаг 1
+    formData.fullName = fullName.value;
+    formData.age = age.value;
+    formData.email = email.value;
+    formData.phone = phone.value;
+
+    // Шаг 2
+    formData.education = education.value;
+    formData.profession = profession.value;
+    formData.experience = experience.value;
+    formData.company = company.value;
+
+    // Шаг 3 — чекбоксы
+    formData.interests = [...interestsCheckboxes]
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    formData.aboutMe = aboutMe.value;
+
+    saveProgress();
+}
+
+function loadFieldData() {
+    fullName.value = formData.fullName || '';
+    age.value = formData.age || '';
+    email.value = formData.email || '';
+    phone.value = formData.phone || '';
+    education.value = formData.education || 'Среднее';
+    profession.value = formData.profession || '';
+    experience.value = formData.experience || '';
+    company.value = formData.company || '';
+
+    interestsCheckboxes.forEach(cb => {
+        cb.checked = formData.interests.includes(cb.value);
+    });
+
+    aboutMe.value = formData.aboutMe || '';
+}
+
+// 5. НАВИГАЦИЯ
+function goToStep(step) {
+    saveFieldData();
+
+    // Скрыть все, показать текущий
+    steps.forEach(s => s.style.display = 'none');
+    const target = document.querySelector(`.form-step[data-step="${step}"]`);
+    if (target) target.style.display = 'block';
+
+    currentStep = step;
+    updateProgress();
+    saveProgress();
+
+    if (step === TOTAL_STEPS - 1) updateSummary();
+}
+
+function nextStep() {
+    if (!validateStep(currentStep)) return;
+    if (currentStep < TOTAL_STEPS - 1) goToStep(currentStep + 1);
+}
+
+function prevStep() {
+    if (currentStep > 0) goToStep(currentStep - 1);
+}
+
+// 6. ВАЛИДАЦИЯ
+function validateStep(step) {
+    if (step === 0) {
+        if (!fullName.value.trim() || fullName.value.trim().length < 2) {
+            alert('Введите имя (минимум 2 символа)');
+            return false;
+        }
+        if (age.value && (parseInt(age.value) < 1 || parseInt(age.value) > 120)) {
+            alert('Возраст от 1 до 120');
+            return false;
+        }
+        if (email.value && !email.value.includes('@')) {
+            alert('Некорректный email');
+            return false;
+        }
+    }
+
+    if (step === 1) {
+        if (!profession.value.trim()) {
+            alert('Введите профессию');
+            return false;
+        }
+        if (experience.value && (parseInt(experience.value) < 0 || parseInt(experience.value) > 50)) {
+            alert('Опыт от 0 до 50 лет');
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// 7. ПРОГРЕСС
+function updateProgress() {
+    const percent = ((currentStep + 1) / TOTAL_STEPS) * 100;
+    progressFill.style.width = percent + '%';
+
+    progressSteps.forEach((step, i) => {
+        step.classList.toggle('done', i < currentStep);
+        step.classList.toggle('active', i === currentStep);
+    });
+}
+
+// 8. ИТОГ
+function updateSummary() {
+    const fields = [
+        ['Имя', formData.fullName],
+        ['Возраст', formData.age],
+        ['Email', formData.email],
+        ['Телефон', formData.phone],
+        ['Образование', formData.education],
+        ['Профессия', formData.profession],
+        ['Опыт', formData.experience ? formData.experience + ' лет' : ''],
+        ['Компания', formData.company],
+        ['Интересы', formData.interests.join(', ')],
+        ['О себе', formData.aboutMe]
+    ];
+
+    summaryContainer.innerHTML = fields.map(([label, value]) => `
+        <div>
+            <span>${label}:</span>
+            <span>${escapeHtml(value) || '—'}</span>
+        </div>
+    `).join('');
+}
+
+// 9. ОТПРАВКА
+function submitForm() {
+    saveFieldData();
+
+    if (!formData.fullName || !formData.profession) {
+        alert('Заполните обязательные поля');
+        return;
+    }
+
+    alert('✅ Анкета отправлена!');
+
+    // Очищаем
+    localStorage.removeItem(STORAGE_KEY);
+    formData = {
+        fullName: '', age: '', email: '', phone: '',
+        education: 'Среднее', profession: '', experience: '', company: '',
+        interests: [], aboutMe: ''
+    };
+
+    loadFieldData();
+    goToStep(0);
+}
+
+// 10. УТИЛИТА
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 11. INIT
+function init() {
+    loadProgress();
+    loadFieldData();
+    goToStep(currentStep);
+
+    // Сохраняем при вводе
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.addEventListener('input', saveFieldData);
+        el.addEventListener('change', saveFieldData);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
