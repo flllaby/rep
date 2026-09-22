@@ -1,0 +1,145 @@
+// 1. ДАННЫЕ
+let wishlist = [];
+let editingId = null;
+let dragIndex = null;
+const STORAGE_KEY = 'wishlist';
+const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23f0ebf8"/%3E%3Ctext x="100" y="115" text-anchor="middle" font-size="60" fill="%237c3aed"%3E🌟%3C/text%3E%3C/svg%3E';
+
+// 2. DOM
+const wishesContainer = document.getElementById('wishesContainer');
+const wishForm = document.getElementById('wishForm');
+const showFormBtn = document.getElementById('showFormBtn');
+const saveWishBtn = document.getElementById('saveWishBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+
+const wishTitle = document.getElementById('wishTitle');
+const wishCategory = document.getElementById('wishCategory');
+const wishImage = document.getElementById('wishImage');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(wishlist));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) wishlist = JSON.parse(saved);
+}
+
+// 4. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 5. РЕНДЕР
+function render() {
+    if (wishlist.length === 0) {
+        wishesContainer.innerHTML = '<p>Нет желаний</p>';
+        return;
+    }
+
+    wishesContainer.innerHTML = wishlist.map((wish, index) => `
+        <div draggable="true" data-index="${index}">
+            <img src="${wish.image || PLACEHOLDER}" alt="${escapeHtml(wish.title)}"
+                 onerror="this.src='${PLACEHOLDER}'">
+            <div>${escapeHtml(wish.title)}</div>
+            <div>${escapeHtml(wish.category)}</div>
+            <button onclick="deleteWish(${index})">Удалить</button>
+        </div>
+    `).join('');
+
+    // Навешиваем обработчики DnD
+    document.querySelectorAll('[draggable="true"]').forEach(card => {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('drop', handleDrop);
+    });
+}
+
+// 6. DRAG AND DROP
+function handleDragStart(e) {
+    dragIndex = Number(e.target.closest('[data-index]').dataset.index);
+    e.target.style.opacity = '0.5';
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();   // ← обязательно, иначе drop не сработает
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    e.target.style.opacity = '1';
+
+    const target = e.target.closest('[data-index]');
+    if (!target) return;
+
+    const dropIndex = Number(target.dataset.index);
+    if (dragIndex === null || dragIndex === dropIndex) return;
+
+    // Перестановка
+    const [moved] = wishlist.splice(dragIndex, 1);
+    wishlist.splice(dropIndex, 0, moved);
+
+    dragIndex = null;
+    save();
+    render();
+}
+
+// 7. ФОРМА
+function showForm() {
+    wishForm.style.display = 'block';
+    showFormBtn.style.display = 'none';
+    wishTitle.focus();
+}
+
+function clearForm() {
+    wishTitle.value = '';
+    wishImage.value = '';
+    wishCategory.value = 'Путешествия';
+    editingId = null;
+    wishForm.style.display = 'none';
+    showFormBtn.style.display = 'block';
+}
+
+// 8. CRUD
+function addWish() {
+    const title = wishTitle.value.trim();
+    if (!title) {
+        alert('Введите название!');
+        return;
+    }
+
+    wishlist.push({
+        id: Date.now().toString(),
+        title: title,
+        category: wishCategory.value,
+        image: wishImage.value.trim(),
+        createdAt: new Date().toISOString()
+    });
+
+    save();
+    render();
+    clearForm();
+}
+
+function deleteWish(index) {
+    if (!confirm('Удалить желание?')) return;
+    wishlist.splice(index, 1);
+    save();
+    render();
+}
+
+// 9. INIT
+function init() {
+    load();
+    render();
+
+    showFormBtn.addEventListener('click', showForm);
+    cancelBtn.addEventListener('click', clearForm);
+    saveWishBtn.addEventListener('click', addWish);
+}
+
+document.addEventListener('DOMContentLoaded', init);
