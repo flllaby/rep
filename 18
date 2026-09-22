@@ -1,0 +1,161 @@
+// 1. СТАНДАРТНЫЕ ЦИТАТЫ (урезал до 5)
+const defaultQuotes = [
+    { text: 'Жизнь — это то, что с тобой происходит, пока ты строишь планы.', author: 'Джон Леннон' },
+    { text: 'Будьте изменением, которое вы хотите видеть в мире.',           author: 'Махатма Ганди' },
+    { text: 'Человек — это то, во что он верит.',                             author: 'Антон Чехов' },
+    { text: 'Ваше время ограничено, не тратьте его, живя чужой жизнью.',      author: 'Стив Джобс' },
+    { text: 'Не бойтесь, что у вас что-то не получится. Бойтесь, что у вас не получится попробовать.', author: 'Михаил Барышников' }
+];
+
+// 2. ДАННЫЕ
+let quotes = [];
+const STORAGE_KEY = 'userQuotes';
+
+// 3. DOM
+const quoteText = document.getElementById('quoteText');
+const quoteAuthor = document.getElementById('quoteAuthor');
+const randomBtn = document.getElementById('randomBtn');
+
+const quoteInput = document.getElementById('quoteInput');
+const authorInput = document.getElementById('authorInput');
+const addBtn = document.getElementById('addBtn');
+
+const quotesContainer = document.getElementById('quotesContainer');
+const quoteCount = document.getElementById('quoteCount');
+
+// 4. LOCALSTORAGE — только пользовательские
+function saveUserQuotes() {
+    // Пользовательские — это всё, что после стандартных
+    const userQuotes = quotes.slice(defaultQuotes.length);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userQuotes));
+}
+
+function loadQuotes() {
+    // Начинаем со стандартных
+    quotes = [...defaultQuotes];
+
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    try {
+        const userQuotes = JSON.parse(saved);
+        quotes = [...defaultQuotes, ...userQuotes];
+    } catch (e) {}
+}
+
+// 5. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 6. СЛУЧАЙНАЯ ЦИТАТА
+function showRandomQuote() {
+    if (quotes.length === 0) {
+        quoteText.textContent = 'Нет доступных цитат';
+        quoteAuthor.textContent = '';
+        return;
+    }
+
+    const index = Math.floor(Math.random() * quotes.length);
+    const quote = quotes[index];
+
+    quoteText.textContent = `"${quote.text}"`;
+    quoteAuthor.textContent = `— ${quote.author}`;
+}
+
+// 7. РЕНДЕР СПИСКА
+function render() {
+    quoteCount.textContent = quotes.length;
+
+    if (quotes.length === 0) {
+        quotesContainer.innerHTML = '<p>Нет цитат</p>';
+        return;
+    }
+
+    // Показываем от новых к старым — переворачиваем
+    const reversed = [...quotes].reverse();
+
+    quotesContainer.innerHTML = reversed.map((quote, i) => {
+        // Реальный индекс в оригинальном массиве
+        const realIndex = quotes.length - 1 - i;
+
+        // Пользовательская цитата? (индекс >= числа стандартных)
+        const isUser = realIndex >= defaultQuotes.length;
+
+        return `
+            <div>
+                <div>"${escapeHtml(quote.text)}"</div>
+                <div>— ${escapeHtml(quote.author)}</div>
+                <button onclick="useQuote(${realIndex})">Использовать</button>
+                ${isUser ? `<button onclick="deleteQuote(${realIndex})">Удалить</button>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// 8. ДОБАВЛЕНИЕ
+function addQuote() {
+    const text = quoteInput.value.trim();
+    const author = authorInput.value.trim() || 'Неизвестный автор';
+
+    if (!text) return;
+
+    // Дубликат?
+    const isDuplicate = quotes.some(q =>
+        q.text.toLowerCase() === text.toLowerCase() &&
+        q.author.toLowerCase() === author.toLowerCase()
+    );
+
+    if (isDuplicate) {
+        alert('Такая цитата уже есть!');
+        return;
+    }
+
+    quotes.push({ text, author });
+
+    saveUserQuotes();
+    render();
+
+    quoteInput.value = '';
+    authorInput.value = '';
+    quoteInput.focus();
+}
+
+// 9. ИСПОЛЬЗОВАНИЕ
+function useQuote(index) {
+    const quote = quotes[index];
+    if (!quote) return;
+
+    quoteText.textContent = `"${quote.text}"`;
+    quoteAuthor.textContent = `— ${quote.author}`;
+}
+
+// 10. УДАЛЕНИЕ
+function deleteQuote(index) {
+    // Стандартные удалять нельзя
+    if (index < defaultQuotes.length) {
+        alert('Нельзя удалить стандартную цитату');
+        return;
+    }
+
+    if (!confirm('Удалить цитату?')) return;
+
+    quotes.splice(index, 1);
+
+    saveUserQuotes();
+    render();
+}
+
+// 11. INIT
+function init() {
+    loadQuotes();
+    showRandomQuote();
+    render();
+
+    randomBtn.addEventListener('click', showRandomQuote);
+    addBtn.addEventListener('click', addQuote);
+}
+
+document.addEventListener('DOMContentLoaded', init);
