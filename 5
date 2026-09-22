@@ -1,0 +1,162 @@
+// 1. ДАННЫЕ
+let entries = [];
+let selectedDate = '';
+let selectedMood = '';
+const STORAGE_KEY = 'moodEntries';
+
+// 2. DOM
+const dateInput = document.getElementById('dateInput');
+const selectedMoodDisplay = document.getElementById('selectedMood');
+const commentInput = document.getElementById('commentInput');
+const saveBtn = document.getElementById('saveBtn');
+const entriesList = document.getElementById('entriesList');
+const emojiButtons = document.querySelectorAll('.emoji');
+
+// 3. СЛОВАРИ ЭМОДЗИ
+const moodEmojis = {
+    great: '😍', good: '😊', okay: '😐', bad: '😔', terrible: '😢'
+};
+const moodNames = {
+    great: 'Отлично', good: 'Хорошо', okay: 'Нормально',
+    bad: 'Плохо', terrible: 'Ужасно'
+};
+
+// 4. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) entries = JSON.parse(saved);
+}
+
+// 5. ДАТА
+function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('ru-RU', {
+        day: 'numeric', month: 'long', year: 'numeric'
+    });
+}
+
+// 6. ВЫБОР ЭМОЦИИ
+function selectMood(mood) {
+    selectedMood = mood;
+
+    emojiButtons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mood === mood);
+    });
+
+    selectedMoodDisplay.textContent = `Выбрано: ${moodEmojis[mood]} ${moodNames[mood]}`;
+}
+
+// 7. РЕНДЕР
+function render() {
+    if (entries.length === 0) {
+        entriesList.innerHTML = '<p>Нет записей</p>';
+        return;
+    }
+
+    // Сортируем от новых к старым
+    const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+
+    entriesList.innerHTML = sorted.map(entry => `
+        <div>
+            <div>
+                <span>${formatDate(entry.date)}</span>
+                <span>${moodEmojis[entry.mood] || '😊'}</span>
+            </div>
+            ${entry.comment ? `<div>${escapeHtml(entry.comment)}</div>` : ''}
+            <button onclick="deleteEntry('${entry.date}')">Удалить</button>
+        </div>
+    `).join('');
+}
+
+// 8. СОХРАНЕНИЕ
+function saveEntry() {
+    if (!selectedDate || !selectedMood) return;
+
+    const comment = commentInput.value.trim();
+    const existing = entries.find(e => e.date === selectedDate);
+
+    if (existing) {
+        // Обновляем
+        existing.mood = selectedMood;
+        existing.comment = comment;
+    } else {
+        // Добавляем
+        entries.push({
+            date: selectedDate,
+            mood: selectedMood,
+            comment: comment
+        });
+    }
+
+    save();
+    render();
+    clearForm();
+}
+
+// 9. УДАЛЕНИЕ
+function deleteEntry(date) {
+    if (!confirm('Удалить запись?')) return;
+    entries = entries.filter(e => e.date !== date);
+    save();
+    render();
+}
+
+// 10. ЗАГРУЗКА ЗАПИСИ НА ДАТУ
+function loadEntryForDate(date) {
+    const entry = entries.find(e => e.date === date);
+
+    if (entry) {
+        selectMood(entry.mood);
+        commentInput.value = entry.comment || '';
+    } else {
+        clearForm();
+    }
+}
+
+// 11. ОЧИСТКА ФОРМЫ
+function clearForm() {
+    selectedMood = '';
+    commentInput.value = '';
+    selectedMoodDisplay.textContent = 'Выбрано: -';
+    emojiButtons.forEach(btn => btn.classList.remove('active'));
+}
+
+// 12. ВСПОМОГАТЕЛЬНАЯ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 13. INIT
+function init() {
+    load();
+
+    const today = new Date().toISOString().split('T')[0];
+    selectedDate = today;
+    dateInput.value = today;
+
+    loadEntryForDate(today);
+    render();
+
+    // Смена даты → подгружаем запись
+    dateInput.addEventListener('change', function () {
+        selectedDate = this.value;
+        loadEntryForDate(selectedDate);
+    });
+
+    // Выбор эмоции
+    emojiButtons.forEach(btn => {
+        btn.addEventListener('click', function () {
+            selectMood(this.dataset.mood);
+        });
+    });
+
+    saveBtn.addEventListener('click', saveEntry);
+}
+
+document.addEventListener('DOMContentLoaded', init);
