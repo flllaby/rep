@@ -1,0 +1,152 @@
+// 1. ДАННЫЕ
+let weatherRecords = [];
+const STORAGE_KEY = 'weatherRecords';
+
+// 2. DOM
+const weatherDate = document.getElementById('weatherDate');
+const weatherTemp = document.getElementById('weatherTemp');
+const weatherCondition = document.getElementById('weatherCondition');
+const weatherWind = document.getElementById('weatherWind');
+const weatherNote = document.getElementById('weatherNote');
+const addBtn = document.getElementById('addBtn');
+
+const tableBody = document.getElementById('weatherTableBody');
+const emptyMessage = document.getElementById('emptyMessage');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(weatherRecords));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) weatherRecords = JSON.parse(saved);
+}
+
+// 4. ДАТА
+function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+}
+
+// 5. КЛАССЫ ПО ПОРОГАМ
+function getTempClass(temp) {
+    if (temp >= 25) return 'temp-hot';
+    if (temp >= 15) return 'temp-warm';
+    if (temp >= 0)  return 'temp-cold';
+    return 'temp-freezing';
+}
+
+function getWindClass(wind) {
+    if (wind < 2) return 'wind-calm';
+    if (wind < 5) return 'wind-moderate';
+    return 'wind-strong';
+}
+
+// 6. РЕНДЕР
+function render() {
+    if (weatherRecords.length === 0) {
+        tableBody.innerHTML = '';
+        emptyMessage.style.display = 'block';
+        return;
+    }
+
+    emptyMessage.style.display = 'none';
+
+    // Сортируем по дате (от новых к старым)
+    const sorted = [...weatherRecords].sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    tableBody.innerHTML = sorted.map((r, i) => {
+        const index = weatherRecords.indexOf(r);   // оригинальный индекс
+        return `
+            <tr>
+                <td>${i + 1}</td>
+                <td>${formatDate(r.date)}</td>
+                <td class="${getTempClass(r.temperature)}">${r.temperature}°C</td>
+                <td>${r.condition}</td>
+                <td class="${getWindClass(r.wind)}">${r.wind} м/с</td>
+                <td>${r.note || '—'}</td>
+                <td><button onclick="deleteRecord(${index})">✕</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 7. ДОБАВЛЕНИЕ
+function addRecord() {
+    const date = weatherDate.value;
+    const temp = parseFloat(weatherTemp.value);
+    const condition = weatherCondition.value;
+    const wind = parseFloat(weatherWind.value);
+    const note = weatherNote.value.trim();
+
+    // Валидация
+    if (!date) return;
+    if (isNaN(temp) || temp < -50 || temp > 50) {
+        alert('Температура должна быть от -50 до +50°C');
+        return;
+    }
+    if (isNaN(wind) || wind < 0 || wind > 50) {
+        alert('Ветер должен быть от 0 до 50 м/с');
+        return;
+    }
+
+    // Проверка дубликата даты
+    if (weatherRecords.some(r => r.date === date)) {
+        alert('Запись на эту дату уже есть');
+        return;
+    }
+
+    weatherRecords.push({
+        id: Date.now().toString(),
+        date: date,
+        temperature: temp,
+        condition: condition,
+        wind: wind,
+        note: note
+    });
+
+    save();
+    render();
+
+    // Очистка
+    weatherTemp.value = '';
+    weatherWind.value = '';
+    weatherNote.value = '';
+    weatherDate.focus();
+}
+
+// 8. УДАЛЕНИЕ
+function deleteRecord(index) {
+    const record = weatherRecords[index];
+    if (!record) return;
+
+    if (!confirm(`Удалить запись за ${formatDate(record.date)}?`)) return;
+
+    weatherRecords.splice(index, 1);
+    save();
+    render();
+}
+
+// 9. INIT
+function init() {
+    load();
+
+    // Сегодняшняя дата
+    weatherDate.value = new Date().toISOString().split('T')[0];
+
+    render();
+
+    addBtn.addEventListener('click', addRecord);
+
+    // Enter в последнем поле → добавить
+    weatherNote.addEventListener('keypress', e => {
+        if (e.key === 'Enter') addRecord();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
