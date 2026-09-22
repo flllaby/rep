@@ -1,0 +1,168 @@
+// 1. ДАННЫЕ
+let transactions = [];
+const STORAGE_KEY = 'expenseTracker';
+
+// 2. DOM
+const balanceDisplay = document.getElementById('balanceDisplay');
+const totalIncome = document.getElementById('totalIncome');
+const totalExpense = document.getElementById('totalExpense');
+const transactionsList = document.getElementById('transactionsList');
+
+const transactionType = document.getElementById('transactionType');
+const transactionCategory = document.getElementById('transactionCategory');
+const transactionAmount = document.getElementById('transactionAmount');
+const transactionDate = document.getElementById('transactionDate');
+const transactionDescription = document.getElementById('transactionDescription');
+const addBtn = document.getElementById('addBtn');
+
+// 3. КАТЕГОРИИ
+const CATEGORIES = {
+    income:  ['Зарплата', 'Фриланс', 'Подарки', 'Инвестиции', 'Другое'],
+    expense: ['Еда', 'Транспорт', 'Жильё', 'Развлечения', 'Здоровье', 'Одежда', 'Другое']
+};
+
+// 4. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) transactions = JSON.parse(saved);
+}
+
+// 5. УТИЛИТЫ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString('ru-RU', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+}
+
+// 6. ПОДСЧЁТ БАЛАНСА
+function calculateBalance() {
+    let income = 0;
+    let expense = 0;
+
+    transactions.forEach(t => {
+        const amount = Number(t.amount);
+        if (t.type === 'income') income += amount;
+        else expense += amount;
+    });
+
+    return {
+        income,
+        expense,
+        balance: income - expense
+    };
+}
+
+// 7. ОБНОВЛЕНИЕ КАТЕГОРИЙ
+function updateCategories() {
+    const type = transactionType.value;   // 'income' или 'expense'
+    const list = CATEGORIES[type];
+
+    // Собираем новые опции через innerHTML
+    transactionCategory.innerHTML = list
+        .map(cat => `<option>${cat}</option>`)
+        .join('');
+}
+
+// 8. РЕНДЕР
+function render() {
+    // Баланс
+    const { income, expense, balance } = calculateBalance();
+    balanceDisplay.textContent = balance.toLocaleString('ru-RU') + ' ₽';
+    totalIncome.textContent = income.toLocaleString('ru-RU') + ' ₽';
+    totalExpense.textContent = expense.toLocaleString('ru-RU') + ' ₽';
+
+    // Список
+    if (transactions.length === 0) {
+        transactionsList.innerHTML = '<p>Нет операций</p>';
+        return;
+    }
+
+    // Сортируем от новых к старым
+    const sorted = [...transactions].sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    transactionsList.innerHTML = sorted.map(t => {
+        const sign = t.type === 'income' ? '+' : '−';
+        const index = transactions.indexOf(t);   // оригинальный индекс для удаления
+
+        return `
+            <div>
+                <div>
+                    <div>${escapeHtml(t.category)}</div>
+                    ${t.description ? `<div>${escapeHtml(t.description)}</div>` : ''}
+                    <div>${formatDate(t.date)}</div>
+                </div>
+                <div>${sign} ${Number(t.amount).toLocaleString('ru-RU')} ₽</div>
+                <button onclick="deleteTransaction(${index})">✕</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// 9. ДОБАВЛЕНИЕ
+function addTransaction() {
+    const type = transactionType.value;
+    const category = transactionCategory.value;
+    const amount = parseFloat(transactionAmount.value);
+    const date = transactionDate.value;
+    const description = transactionDescription.value.trim();
+
+    if (!amount || amount <= 0) return;
+
+    transactions.push({
+        id: Date.now().toString(),
+        type: type,
+        category: category,
+        amount: amount,
+        date: date,
+        description: description
+    });
+
+    save();
+    render();
+
+    // Очистка
+    transactionAmount.value = '';
+    transactionDescription.value = '';
+    transactionAmount.focus();
+}
+
+// 10. УДАЛЕНИЕ
+function deleteTransaction(index) {
+    if (!confirm('Удалить запись?')) return;
+    transactions.splice(index, 1);
+    save();
+    render();
+}
+
+// 11. INIT
+function init() {
+    load();
+
+    // Сегодняшняя дата
+    transactionDate.value = new Date().toISOString().split('T')[0];
+
+    // Категории для начального типа
+    updateCategories();
+
+    render();
+
+    // Смена типа → обновляем категории
+    transactionType.addEventListener('change', updateCategories);
+
+    // Добавление
+    addBtn.addEventListener('click', addTransaction);
+}
+
+document.addEventListener('DOMContentLoaded', init);
