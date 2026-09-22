@@ -1,0 +1,144 @@
+// 1. ДАННЫЕ
+let tasks = [];
+let selectedDate = '';
+let editingId = null;
+const STORAGE_KEY = 'tasks';
+
+// 2. DOM
+const dateInput = document.getElementById('dateInput');
+const taskInput = document.getElementById('taskInput');
+const addBtn = document.getElementById('addBtn');
+const taskList = document.getElementById('taskList');
+const taskCount = document.getElementById('taskCount');
+const datesList = document.getElementById('datesList');
+
+// 3. LOCALSTORAGE
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) tasks = JSON.parse(saved);
+}
+
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
+// 4. УТИЛИТЫ
+function formatDate(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+function tasksByDate(date) {
+    return tasks.filter(t => t.date === date);
+}
+
+function uniqueDates() {
+    return [...new Set(tasks.map(t => t.date))].sort();
+}
+
+// 5. РЕНДЕР
+function render() {
+    // Задачи на выбранную дату
+    const dayTasks = tasksByDate(selectedDate);
+    taskCount.textContent = dayTasks.length;
+
+    if (dayTasks.length === 0) {
+        taskList.innerHTML = '<li>Нет задач</li>';
+    } else {
+        taskList.innerHTML = dayTasks.map(task => `
+            <li class="${task.completed ? 'done' : ''}">
+                <input type="checkbox" ${task.completed ? 'checked' : ''}
+                       onchange="toggleTask('${task.id}')">
+                <span>${task.text}</span>
+                <button onclick="startEdit('${task.id}')">✏️</button>
+                <button onclick="deleteTask('${task.id}')">✖</button>
+            </li>
+        `).join('');
+    }
+
+    // Список дат
+    const dates = uniqueDates();
+    datesList.innerHTML = dates.map(date => `
+        <button class="${date === selectedDate ? 'active' : ''}"
+                onclick="selectDate('${date}')">
+            ${formatDate(date)} (${tasksByDate(date).length})
+        </button>
+    `).join('');
+}
+
+// 6. CRUD
+function addTask() {
+    const text = taskInput.value.trim();
+    if (!text) return;
+
+    if (editingId) {
+        tasks = tasks.map(t => t.id === editingId ? { ...t, text } : t);
+        editingId = null;
+        addBtn.textContent = 'Добавить';
+    } else {
+        tasks.push({
+            id: Date.now().toString(),
+            text,
+            date: selectedDate,
+            completed: false
+        });
+    }
+
+    taskInput.value = '';
+    save();
+    render();
+}
+
+function deleteTask(id) {
+    if (!confirm('Удалить?')) return;
+    tasks = tasks.filter(t => t.id !== id);
+    save();
+    render();
+}
+
+function toggleTask(id) {
+    tasks = tasks.map(t =>
+        t.id === id ? { ...t, completed: !t.completed } : t
+    );
+    save();
+    render();
+}
+
+function startEdit(id) {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    taskInput.value = task.text;
+    editingId = id;
+    addBtn.textContent = 'Сохранить';
+    taskInput.focus();
+}
+
+function selectDate(date) {
+    selectedDate = date;
+    dateInput.value = date;
+    render();
+}
+
+// 7. INIT
+function init() {
+    load();
+
+    const today = new Date().toISOString().split('T')[0];
+    selectedDate = today;
+    dateInput.value = today;
+
+    render();
+
+    dateInput.addEventListener('change', function () {
+        selectedDate = this.value;
+        render();
+    });
+
+    taskInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') addTask();
+    });
+
+    addBtn.addEventListener('click', addTask);
+}
+
+document.addEventListener('DOMContentLoaded', init);
