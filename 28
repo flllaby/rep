@@ -1,0 +1,126 @@
+// 1. НАСТРОЙКИ
+const DEFAULTS = {
+    bgColor: '#6c5ce7',
+    textColor: '#ffffff',
+    fontFamily: 'Arial, sans-serif',
+    fontSize: 20,
+    padding: 20,
+    margin: 10,
+    borderRadius: 10
+};
+
+let settings = { ...DEFAULTS };
+const STORAGE_KEY = 'cssEditorSettings';
+
+// 2. DOM
+const previewBlock = document.getElementById('previewBlock');
+const cssCode = document.getElementById('cssCode');
+
+const bgColor = document.getElementById('bgColor');
+const textColor = document.getElementById('textColor');
+const fontFamily = document.getElementById('fontFamily');
+const fontSize = document.getElementById('fontSize');
+const fontSizeDisplay = document.getElementById('fontSizeDisplay');
+const padding = document.getElementById('padding');
+const paddingDisplay = document.getElementById('paddingDisplay');
+const margin = document.getElementById('margin');
+const marginDisplay = document.getElementById('marginDisplay');
+const borderRadius = document.getElementById('borderRadius');
+const borderRadiusDisplay = document.getElementById('borderRadiusDisplay');
+const copyBtn = document.getElementById('copyBtn');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        settings = { ...DEFAULTS, ...JSON.parse(saved) };
+    }
+}
+
+// 4. ПРИМЕНЕНИЕ СТИЛЕЙ
+function applySettings() {
+    // Применяем к preview-блоку
+    previewBlock.style.backgroundColor = settings.bgColor;
+    previewBlock.style.color = settings.textColor;
+    previewBlock.style.fontFamily = settings.fontFamily;
+    previewBlock.style.fontSize = settings.fontSize + 'px';
+    previewBlock.style.padding = settings.padding + 'px';
+    previewBlock.style.margin = settings.margin + 'px';
+    previewBlock.style.borderRadius = settings.borderRadius + 'px';
+
+    // Синхронизируем панель управления
+    bgColor.value = settings.bgColor;
+    textColor.value = settings.textColor;
+    fontFamily.value = settings.fontFamily;
+
+    fontSize.value = settings.fontSize;
+    fontSizeDisplay.textContent = settings.fontSize + 'px';
+
+    padding.value = settings.padding;
+    paddingDisplay.textContent = settings.padding + 'px';
+
+    margin.value = settings.margin;
+    marginDisplay.textContent = settings.margin + 'px';
+
+    borderRadius.value = settings.borderRadius;
+    borderRadiusDisplay.textContent = settings.borderRadius + 'px';
+
+    // CSS-код
+    cssCode.textContent = generateCSS();
+
+    // Сохраняем
+    save();
+}
+
+// 5. ГЕНЕРАЦИЯ CSS
+function generateCSS() {
+    return `.preview-block {
+  background-color: ${settings.bgColor};
+  color: ${settings.textColor};
+  font-family: ${settings.fontFamily};
+  font-size: ${settings.fontSize}px;
+  padding: ${settings.padding}px;
+  margin: ${settings.margin}px;
+  border-radius: ${settings.borderRadius}px;
+}`;
+}
+
+// 6. ОБНОВЛЕНИЕ ОДНОЙ НАСТРОЙКИ
+function update(key, value) {
+    settings[key] = value;
+    applySettings();
+}
+
+// 7. КОПИРОВАНИЕ
+function copyCSS() {
+    navigator.clipboard.writeText(cssCode.textContent).then(() => {
+        copyBtn.textContent = '✅ Скопировано!';
+        setTimeout(() => {
+            copyBtn.textContent = '📋 Копировать';
+        }, 2000);
+    });
+}
+
+// 8. INIT
+function init() {
+    load();
+    applySettings();
+
+    // Обработчики — все поля
+    bgColor.addEventListener('input', () => update('bgColor', bgColor.value));
+    textColor.addEventListener('input', () => update('textColor', textColor.value));
+    fontFamily.addEventListener('change', () => update('fontFamily', fontFamily.value));
+
+    fontSize.addEventListener('input', () => update('fontSize', parseInt(fontSize.value)));
+    padding.addEventListener('input', () => update('padding', parseInt(padding.value)));
+    margin.addEventListener('input', () => update('margin', parseInt(margin.value)));
+    borderRadius.addEventListener('input', () => update('borderRadius', parseInt(borderRadius.value)));
+
+    copyBtn.addEventListener('click', copyCSS);
+}
+
+document.addEventListener('DOMContentLoaded', init);
