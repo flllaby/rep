@@ -1,0 +1,104 @@
+// 1. ДАННЫЕ
+let timeLeft = 25 * 60;
+let isRunning = false;
+let isBreak = false;
+let timerId = null;
+let cyclesCompleted = 0;
+
+const WORK_TIME = 25 * 60;
+const BREAK_TIME = 5 * 60;
+const STORAGE_KEY = 'pomodoro';
+
+// 2. DOM
+const display = document.getElementById('timerDisplay');
+const status = document.getElementById('timerStatus');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const cycleCount = document.getElementById('cycleCount');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ cyclesCompleted }));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) cyclesCompleted = JSON.parse(saved).cyclesCompleted || 0;
+}
+
+// 4. ОТОБРАЖЕНИЕ
+function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function render() {
+    display.textContent = formatTime(timeLeft);
+    status.textContent = isBreak ? '☕ Отдых' : '💼 Работа';
+    cycleCount.textContent = cyclesCompleted;
+
+    // Кнопки
+    startBtn.style.display = isRunning ? 'none' : 'inline-block';
+    pauseBtn.style.display = isRunning ? 'inline-block' : 'none';
+}
+
+// 5. ТАЙМЕР
+function tick() {
+    timeLeft--;
+    render();
+
+    if (timeLeft <= 0) {
+        clearInterval(timerId);
+        timerId = null;
+        isRunning = false;
+
+        if (!isBreak) {
+            cyclesCompleted++;
+            save();
+            isBreak = true;
+            timeLeft = BREAK_TIME;
+        } else {
+            isBreak = false;
+            timeLeft = WORK_TIME;
+        }
+        render();
+    }
+}
+
+function start() {
+    if (isRunning) return;
+    isRunning = true;
+    timerId = setInterval(tick, 1000);
+    render();
+}
+
+function pause() {
+    if (!isRunning) return;
+    isRunning = false;
+    clearInterval(timerId);
+    timerId = null;
+    render();
+}
+
+function reset() {
+    clearInterval(timerId);
+    timerId = null;
+    isRunning = false;
+    isBreak = false;
+    timeLeft = WORK_TIME;
+    render();
+}
+
+// 6. INIT
+function init() {
+    load();
+    render();
+
+    startBtn.addEventListener('click', start);
+    pauseBtn.addEventListener('click', pause);
+    resetBtn.addEventListener('click', reset);
+}
+
+document.addEventListener('DOMContentLoaded', init);
