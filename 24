@@ -1,0 +1,165 @@
+// 1. ДАННЫЕ
+let characters = [];
+let selectedAvatar = '🧙';
+const STORAGE_KEY = 'characters';
+
+// 2. DOM
+const charName = document.getElementById('charName');
+const charRace = document.getElementById('charRace');
+const charClass = document.getElementById('charClass');
+const statStr = document.getElementById('statStr');
+const statDex = document.getElementById('statDex');
+const statInt = document.getElementById('statInt');
+const statWis = document.getElementById('statWis');
+const statCon = document.getElementById('statCon');
+const statCha = document.getElementById('statCha');
+const createBtn = document.getElementById('createBtn');
+const charactersContainer = document.getElementById('charactersContainer');
+const avatarOptions = document.querySelectorAll('.avatar-option');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(characters));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) characters = JSON.parse(saved);
+}
+
+// 4. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 5. ВАЛИДАЦИЯ — с throw
+function validateCharacter(name, stats) {
+    if (!name || name.length < 2) {
+        throw new Error('Имя должно быть минимум 2 символа');
+    }
+    if (name.length > 30) {
+        throw new Error('Имя не должно превышать 30 символов');
+    }
+
+    // Проверяем все характеристики
+    for (const key in stats) {
+        const val = stats[key];
+        if (isNaN(val) || val < 1 || val > 20) {
+            throw new Error(`Характеристика "${key}" должна быть от 1 до 20`);
+        }
+    }
+
+    // Дубликат имени
+    if (characters.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error(`Персонаж "${name}" уже существует`);
+    }
+}
+
+// 6. РЕНДЕР
+function render() {
+    if (characters.length === 0) {
+        charactersContainer.innerHTML = '<p>Нет персонажей</p>';
+        return;
+    }
+
+    charactersContainer.innerHTML = characters.map((char, index) => `
+        <div>
+            <button onclick="deleteCharacter(${index})">✕</button>
+            <span>${char.avatar}</span>
+            <div>${escapeHtml(char.name)}</div>
+            <div>${char.race} • ${char.class}</div>
+            <div>
+                💪 ${char.stats.strength} |
+                🏃 ${char.stats.dexterity} |
+                🧠 ${char.stats.intelligence} |
+                🕯️ ${char.stats.wisdom} |
+                🛡️ ${char.stats.constitution} |
+                💫 ${char.stats.charisma}
+            </div>
+        </div>
+    `).join('');
+}
+
+// 7. СОЗДАНИЕ — с try/catch
+function createCharacter() {
+    try {
+        const name = charName.value.trim();
+        const stats = {
+            strength:     parseInt(statStr.value) || 10,
+            dexterity:    parseInt(statDex.value) || 10,
+            intelligence: parseInt(statInt.value) || 10,
+            wisdom:       parseInt(statWis.value) || 10,
+            constitution: parseInt(statCon.value) || 10,
+            charisma:     parseInt(statCha.value) || 10
+        };
+
+        // Может выбросить ошибку
+        validateCharacter(name, stats);
+
+        // Всё ок — создаём
+        characters.push({
+            id: Date.now().toString(),
+            name: name,
+            race: charRace.value,
+            class: charClass.value,
+            avatar: selectedAvatar,
+            stats: stats
+        });
+
+        save();
+        render();
+        clearForm();
+
+    } catch (error) {
+        alert('❌ ' + error.message);
+    }
+}
+
+// 8. УДАЛЕНИЕ
+function deleteCharacter(index) {
+    if (!confirm('Удалить персонажа?')) return;
+    characters.splice(index, 1);
+    save();
+    render();
+}
+
+// 9. ФОРМА
+function clearForm() {
+    charName.value = '';
+    statStr.value = 10;
+    statDex.value = 10;
+    statInt.value = 10;
+    statWis.value = 10;
+    statCon.value = 10;
+    statCha.value = 10;
+    charName.focus();
+}
+
+// 10. ВЫБОР АВАТАРА
+avatarOptions.forEach(option => {
+    option.addEventListener('click', function () {
+        // Убираем active у всех
+        avatarOptions.forEach(opt => opt.classList.remove('active'));
+        // Добавляем выбранному
+        this.classList.add('active');
+        // Запоминаем
+        selectedAvatar = this.dataset.avatar;
+    });
+});
+
+// 11. INIT
+function init() {
+    load();
+    render();
+
+    // Первый аватар — активный по умолчанию
+    if (avatarOptions.length > 0) {
+        avatarOptions[0].classList.add('active');
+    }
+
+    createBtn.addEventListener('click', createCharacter);
+}
+
+document.addEventListener('DOMContentLoaded', init);
