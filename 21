@@ -1,0 +1,134 @@
+// 1. ДАННЫЕ
+const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+let schedule = {};   // { 0: [занятия Пн], 1: [...], ... }
+const STORAGE_KEY = 'schedule';
+
+// 2. DOM
+const daySelect = document.getElementById('daySelect');
+const timeSelect = document.getElementById('timeSelect');
+const activityInput = document.getElementById('activityInput');
+const addBtn = document.getElementById('addBtn');
+const scheduleContainer = document.getElementById('scheduleContainer');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) schedule = JSON.parse(saved);
+}
+
+// 4. УТИЛИТА
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 5. РЕНДЕР
+function render() {
+    // Проверяем, есть ли хоть одно занятие
+    const hasAny = Object.values(schedule).some(day => day.length > 0);
+
+    if (!hasAny) {
+        scheduleContainer.innerHTML = '<p>Расписание пусто</p>';
+        return;
+    }
+
+    let html = '';
+
+    // Проходим по всем 7 дням
+    for (let i = 0; i < 7; i++) {
+        const activities = schedule[i] || [];
+        if (activities.length === 0) continue;   // пропускаем пустые
+
+        html += `
+            <div>
+                <h3>${DAYS[i]} <span>(${activities.length})</span></h3>
+                ${activities.map(item => `
+                    <div>
+                        <span>${item.time}</span>
+                        <span>${escapeHtml(item.activity)}</span>
+                        <button onclick="deleteActivity(${i}, '${item.id}')">✕</button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    scheduleContainer.innerHTML = html;
+}
+
+// 6. ДОБАВЛЕНИЕ
+function addItem() {
+    const dayIndex = parseInt(daySelect.value);
+    const time = timeSelect.value;
+    const activity = activityInput.value.trim();
+
+    if (!time || !activity) return;
+
+    // Инициализируем день, если его нет
+    if (!schedule[dayIndex]) schedule[dayIndex] = [];
+
+    // Проверка дубликата
+    const isDuplicate = schedule[dayIndex].some(item =>
+        item.time === time &&
+        item.activity.toLowerCase() === activity.toLowerCase()
+    );
+
+    if (isDuplicate) {
+        alert('Такое занятие уже есть в это время');
+        return;
+    }
+
+    // Добавляем
+    schedule[dayIndex].push({
+        id: Date.now().toString(),
+        time: time,
+        activity: activity
+    });
+
+    // Сортируем по времени
+    schedule[dayIndex].sort((a, b) => a.time.localeCompare(b.time));
+
+    save();
+    render();
+
+    activityInput.value = '';
+    activityInput.focus();
+}
+
+// 7. УДАЛЕНИЕ
+function deleteActivity(dayIndex, activityId) {
+    if (!schedule[dayIndex]) return;
+
+    if (!confirm('Удалить занятие?')) return;
+
+    // Фильтруем — убираем нужное
+    schedule[dayIndex] = schedule[dayIndex].filter(item => item.id !== activityId);
+
+    // Если день пуст — удаляем ключ
+    if (schedule[dayIndex].length === 0) {
+        delete schedule[dayIndex];
+    }
+
+    save();
+    render();
+}
+
+// 8. INIT
+function init() {
+    load();
+    render();
+
+    addBtn.addEventListener('click', addItem);
+
+    // Enter в поле занятия → добавить
+    activityInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') addItem();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
