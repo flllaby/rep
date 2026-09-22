@@ -1,0 +1,147 @@
+// 1. ДАННЫЕ
+let ideas = [];
+let dragIndex = null;
+const STORAGE_KEY = 'ideaBoard';
+const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23f0f2f5"/%3E%3Ctext x="100" y="115" text-anchor="middle" font-size="60" fill="%23b2bec3"%3E💡%3C/text%3E%3C/svg%3E';
+
+// 2. DOM
+const ideaTitle = document.getElementById('ideaTitle');
+const ideaImage = document.getElementById('ideaImage');
+const ideaDescription = document.getElementById('ideaDescription');
+const addBtn = document.getElementById('addBtn');
+const boardContainer = document.getElementById('boardContainer');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ideas));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) ideas = JSON.parse(saved);
+}
+
+// 4. УТИЛИТЫ
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function isValidUrl(str) {
+    try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+// 5. РЕНДЕР
+function render() {
+    if (ideas.length === 0) {
+        boardContainer.innerHTML = '<p>Нет идей</p>';
+        return;
+    }
+
+    boardContainer.innerHTML = ideas.map((idea, index) => `
+        <div draggable="true" data-index="${index}">
+            <img src="${escapeHtml(idea.image) || PLACEHOLDER}"
+                 alt="${escapeHtml(idea.title)}"
+                 onerror="this.src='${PLACEHOLDER}'">
+            <div>
+                <div>${escapeHtml(idea.title)}</div>
+                ${idea.description ? `<div>${escapeHtml(idea.description)}</div>` : ''}
+                <button onclick="deleteIdea(${index})">Удалить</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Навешиваем DnD
+    boardContainer.querySelectorAll('[draggable]').forEach(card => {
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('drop', handleDrop);
+    });
+}
+
+// 6. DRAG AND DROP — 3 обработчика
+function handleDragStart(e) {
+    const card = e.target.closest('[data-index]');
+    dragIndex = Number(card.dataset.index);
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();   // ← обязательно
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+
+    const card = e.target.closest('[data-index]');
+    if (!card) return;
+
+    const dropIndex = Number(card.dataset.index);
+    if (dragIndex === null || dragIndex === dropIndex) return;
+
+    // Перестановка
+    const [moved] = ideas.splice(dragIndex, 1);
+    ideas.splice(dropIndex, 0, moved);
+
+    dragIndex = null;
+    save();
+    render();
+}
+
+// 7. CRUD
+function addIdea() {
+    const title = ideaTitle.value.trim();
+    const image = ideaImage.value.trim();
+    const description = ideaDescription.value.trim();
+
+    if (!title) return;
+
+    // Проверка URL
+    if (image && !isValidUrl(image)) {
+        alert('Некорректная ссылка на изображение');
+        return;
+    }
+
+    // Дубликат
+    if (ideas.some(i => i.title.toLowerCase() === title.toLowerCase())) {
+        alert('Идея с таким названием уже есть');
+        return;
+    }
+
+    ideas.push({
+        id: Date.now().toString(),
+        title: title,
+        image: image,
+        description: description
+    });
+
+    save();
+    render();
+
+    ideaTitle.value = '';
+    ideaImage.value = '';
+    ideaDescription.value = '';
+    ideaTitle.focus();
+}
+
+function deleteIdea(index) {
+    if (!confirm('Удалить идею?')) return;
+    ideas.splice(index, 1);
+    save();
+    render();
+}
+
+// 8. INIT
+function init() {
+    load();
+    render();
+    addBtn.addEventListener('click', addIdea);
+}
+
+document.addEventListener('DOMContentLoaded', init);
