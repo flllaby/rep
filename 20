@@ -1,336 +1,200 @@
-// ========================================
 // 1. ДАННЫЕ
-// ========================================
-
 let habits = [];
-
-// Дни недели
+const STORAGE_KEY = 'habits';
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-const DAYS_FULL = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
 
-// ========================================
-// 2. DOM ЭЛЕМЕНТЫ
-// ========================================
-
+// 2. DOM
 const habitName = document.getElementById('habitName');
 const habitColor = document.getElementById('habitColor');
 const addBtn = document.getElementById('addBtn');
 const habitsContainer = document.getElementById('habitsContainer');
 const emptyMessage = document.getElementById('emptyMessage');
 
-// ========================================
 // 3. LOCALSTORAGE
-// ========================================
-
-function loadHabits() {
-    try {
-        const saved = localStorage.getItem('habits');
-        if (saved) {
-            habits = JSON.parse(saved);
-            return true;
-        }
-    } catch (e) {
-        console.error('Ошибка загрузки:', e);
-    }
-    return false;
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
 }
 
-function saveHabits() {
-    try {
-        localStorage.setItem('habits', JSON.stringify(habits));
-    } catch (e) {
-        console.error('Ошибка сохранения:', e);
-    }
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) habits = JSON.parse(saved);
 }
 
-// ========================================
-// 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ========================================
-
-function getTodayIndex() {
-    // Пн = 0, Вт = 1, ..., Вс = 6
-    const day = new Date().getDay();
-    return day === 0 ? 6 : day - 1;
-}
-
-function getWeekId() {
-    // Получаем идентификатор недели (год + номер недели)
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const diff = now - startOfYear;
-    const weekNumber = Math.ceil((diff / 86400000 + startOfYear.getDay() + 1) / 7);
-    return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
-}
-
-function getDayId(date) {
-    return date.toISOString().split('T')[0];
-}
-
-function getDateFromDayIndex(dayIndex) {
-    const now = new Date();
-    const today = now.getDay();
-    const currentDay = today === 0 ? 6 : today - 1;
-    const diff = dayIndex - currentDay;
-    const date = new Date(now);
-    date.setDate(date.getDate() + diff);
-    return date;
-}
-
-function isToday(dayIndex) {
-    return dayIndex === getTodayIndex();
-}
-
-function isDayDone(habit, dayIndex) {
-    const date = getDateFromDayIndex(dayIndex);
-    const dayId = getDayId(date);
-    return habit.doneDays && habit.doneDays.includes(dayId);
-}
-
-// ========================================
-// 5. РЕНДЕРИНГ
-// ========================================
-
-function renderHabits() {
-    if (habits.length === 0) {
-        habitsContainer.innerHTML = '';
-        emptyMessage.classList.remove('hidden');
-        return;
-    }
-
-    emptyMessage.classList.add('hidden');
-
-    let html = '';
-    habits.forEach((habit, index) => {
-        const color = habit.color || '#6c5ce7';
-        
-        // Считаем статистику
-        const totalDays = habit.doneDays ? habit.doneDays.length : 0;
-        const streak = calculateStreak(habit);
-        
-        html += `
-            <div class="habit-card" style="border-left: 4px solid ${color}">
-                <div class="habit-header">
-                    <span class="habit-name" style="color: ${color}">${escapeHtml(habit.name)}</span>
-                    <div class="habit-actions">
-                        <button class="reset-btn" onclick="resetHabit(${index})">🔄 Сброс</button>
-                        <button class="delete-btn" onclick="deleteHabit(${index})">🗑️</button>
-                    </div>
-                </div>
-                
-                <div class="habit-days">
-                    ${DAYS.map((day, dayIndex) => {
-                        const done = isDayDone(habit, dayIndex);
-                        const today = isToday(dayIndex);
-                        const date = getDateFromDayIndex(dayIndex);
-                        const dayLabel = date.getDate();
-                        
-                        return `
-                            <button 
-                                class="day-btn ${done ? 'done' : ''} ${today ? 'today' : ''}"
-                                onclick="toggleDay(${index}, ${dayIndex})"
-                                style="${done ? `background: ${color}; border-color: ${color};` : ''}"
-                            >
-                                <span class="day-label">${day}</span>
-                                ${dayLabel}
-                            </button>
-                        `;
-                    }).join('')}
-                </div>
-                
-                <div class="habit-stats">
-                    <span>✅ Выполнено: <strong>${totalDays}</strong> дней</span>
-                    <span class="streak">🔥 Серия: <strong>${streak}</strong> дней</span>
-                </div>
-            </div>
-        `;
-    });
-
-    habitsContainer.innerHTML = html;
-}
-
-// ========================================
-// 6. РАСЧЁТ СЕРИИ (STREAK)
-// ========================================
-
-function calculateStreak(habit) {
-    if (!habit.doneDays || habit.doneDays.length === 0) return 0;
-    
-    let streak = 0;
-    const today = new Date();
-    
-    // Проверяем сегодня
-    const todayId = getDayId(today);
-    if (!habit.doneDays.includes(todayId)) {
-        // Проверяем вчера
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayId = getDayId(yesterday);
-        if (!habit.doneDays.includes(yesterdayId)) {
-            return 0;
-        }
-    }
-    
-    // Считаем серию
-    let currentDate = new Date(today);
-    while (true) {
-        const dayId = getDayId(currentDate);
-        if (habit.doneDays.includes(dayId)) {
-            streak++;
-            currentDate.setDate(currentDate.getDate() - 1);
-        } else {
-            break;
-        }
-    }
-    
-    return streak;
-}
-
-// ========================================
-// 7. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-// ========================================
-
+// 4. УТИЛИТА
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-function clearForm() {
+// 5. РАБОТА С ДАТАМИ
+
+// Индекс сегодняшнего дня: Пн=0, ..., Вс=6
+function getTodayIndex() {
+    const d = new Date().getDay();   // 0=Вс, 1=Пн, ..., 6=Сб
+    return d === 0 ? 6 : d - 1;       // Вс → 6, остальные −1
+}
+
+// ID даты в формате 'YYYY-MM-DD'
+function getDayId(date) {
+    return date.toISOString().split('T')[0];
+}
+
+// Дата по индексу дня недели (0=Пн, ..., 6=Вс)
+function getDateFromDayIndex(dayIndex) {
+    const now = new Date();
+    const diff = dayIndex - getTodayIndex();
+    const date = new Date(now);
+    date.setDate(date.getDate() + diff);
+    return date;
+}
+
+// 6. СТАТИСТИКА
+
+// Выполнен ли день?
+function isDone(habit, dayIndex) {
+    const dayId = getDayId(getDateFromDayIndex(dayIndex));
+    return habit.doneDays.includes(dayId);
+}
+
+// Расчёт серии (streak)
+function calculateStreak(habit) {
+    if (!habit.doneDays.length) return 0;
+
+    let streak = 0;
+    const date = new Date();
+
+    // Если сегодня не отмечено — начинаем со вчера
+    if (!habit.doneDays.includes(getDayId(date))) {
+        date.setDate(date.getDate() - 1);
+    }
+
+    // Идём назад, пока есть отметки
+    while (habit.doneDays.includes(getDayId(date))) {
+        streak++;
+        date.setDate(date.getDate() - 1);
+    }
+
+    return streak;
+}
+
+// 7. РЕНДЕР
+function render() {
+    if (habits.length === 0) {
+        habitsContainer.innerHTML = '';
+        emptyMessage.style.display = 'block';
+        return;
+    }
+
+    emptyMessage.style.display = 'none';
+
+    habitsContainer.innerHTML = habits.map((habit, index) => {
+        const color = habit.color;
+
+        // Кнопки дней
+        const daysHtml = DAYS.map((day, dayIndex) => {
+            const done = isDone(habit, dayIndex);
+            const today = dayIndex === getTodayIndex();
+            const date = getDateFromDayIndex(dayIndex).getDate();
+
+            return `
+                <button
+                    class="${done ? 'done' : ''} ${today ? 'today' : ''}"
+                    onclick="toggleDay(${index}, ${dayIndex})"
+                    ${done ? `style="background: ${color}"` : ''}
+                >
+                    ${day}<br>${date}
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div style="border-left: 4px solid ${color}">
+                <div>
+                    <span style="color: ${color}">${escapeHtml(habit.name)}</span>
+                    <button onclick="resetHabit(${index})">Сброс</button>
+                    <button onclick="deleteHabit(${index})">Удалить</button>
+                </div>
+                <div>${daysHtml}</div>
+                <div>
+                    Выполнено: ${habit.doneDays.length} дней |
+                    Серия: ${calculateStreak(habit)} дней
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 8. ДОБАВЛЕНИЕ
+function addHabit() {
+    const name = habitName.value.trim();
+    if (!name) return;
+
+    if (habits.some(h => h.name.toLowerCase() === name.toLowerCase())) {
+        alert('Такая привычка уже есть');
+        return;
+    }
+
+    habits.push({
+        id: Date.now().toString(),
+        name: name,
+        color: habitColor.value,
+        doneDays: []
+    });
+
+    save();
+    render();
+
     habitName.value = '';
     habitName.focus();
 }
 
-// ========================================
-// 8. ДОБАВЛЕНИЕ ПРИВЫЧКИ
-// ========================================
-
-function addHabit() {
-    const name = habitName.value.trim();
-    const color = habitColor.value;
-
-    if (!name) {
-        alert('Введите название привычки!');
-        habitName.focus();
-        return;
-    }
-
-    // Проверка на дубликат
-    if (habits.some(h => h.name.toLowerCase() === name.toLowerCase())) {
-        alert('Такая привычка уже существует!');
-        habitName.focus();
-        return;
-    }
-
-    const newHabit = {
-        id: Date.now().toString(),
-        name: name,
-        color: color,
-        doneDays: [],
-        createdAt: new Date().toISOString()
-    };
-
-    habits.push(newHabit);
-    saveHabits();
-    renderHabits();
-    clearForm();
-
-    console.log(`✅ Добавлена привычка: ${name}`);
-}
-
-// ========================================
-// 9. ПЕРЕКЛЮЧЕНИЕ ДНЯ (ОБРАБОТЧИК)
-// ========================================
-
+// 9. ПЕРЕКЛЮЧЕНИЕ ДНЯ
 function toggleDay(index, dayIndex) {
     const habit = habits[index];
     if (!habit) return;
 
     const date = getDateFromDayIndex(dayIndex);
-    const dayId = getDayId(date);
-    
-    // Проверяем, можно ли отметить будущий день
-    const today = new Date();
-    if (date > today) {
-        alert('Нельзя отмечать будущие дни!');
+
+    // Нельзя отмечать будущее
+    if (date > new Date()) {
+        alert('Нельзя отмечать будущие дни');
         return;
     }
 
-    if (!habit.doneDays) {
-        habit.doneDays = [];
-    }
+    const dayId = getDayId(date);
+    const pos = habit.doneDays.indexOf(dayId);
 
-    const dayIndexInArray = habit.doneDays.indexOf(dayId);
-    
-    if (dayIndexInArray !== -1) {
-        // Убираем отметку
-        habit.doneDays.splice(dayIndexInArray, 1);
+    if (pos !== -1) {
+        habit.doneDays.splice(pos, 1);   // убрать отметку
     } else {
-        // Добавляем отметку
-        habit.doneDays.push(dayId);
+        habit.doneDays.push(dayId);       // добавить отметку
     }
 
-    saveHabits();
-    renderHabits();
+    save();
+    render();
 }
 
-// ========================================
-// 10. УДАЛЕНИЕ ПРИВЫЧКИ
-// ========================================
-
+// 10. УДАЛЕНИЕ И СБРОС
 function deleteHabit(index) {
-    const name = habits[index].name;
-    if (!confirm(`Удалить привычку "${name}"?`)) return;
-
+    if (!confirm('Удалить привычку?')) return;
     habits.splice(index, 1);
-    saveHabits();
-    renderHabits();
-
-    console.log(`🗑️ Удалена привычка: ${name}`);
+    save();
+    render();
 }
-
-// ========================================
-// 11. СБРОС ПРИВЫЧКИ
-// ========================================
 
 function resetHabit(index) {
-    const name = habits[index].name;
-    if (!confirm(`Сбросить прогресс привычки "${name}"?`)) return;
-
+    if (!confirm('Сбросить прогресс?')) return;
     habits[index].doneDays = [];
-    saveHabits();
-    renderHabits();
-
-    console.log(`🔄 Сброшена привычка: ${name}`);
+    save();
+    render();
 }
 
-// ========================================
-// 12. ИНИЦИАЛИЗАЦИЯ
-// ========================================
-
+// 11. INIT
 function init() {
-    console.log('✅ Трекер привычек');
-
-    // Загружаем привычки
-    loadHabits();
-    renderHabits();
-
-    console.log(`📊 Загружено привычек: ${habits.length}`);
-
-    // Обработчики (через addEventListener)
+    load();
+    render();
     addBtn.addEventListener('click', addHabit);
-
-    habitName.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addHabit();
-        }
-    });
-
-    console.log('✅ Трекер привычек готов!');
 }
-
-// ========================================
-// 13. ЗАПУСК
-// ========================================
 
 document.addEventListener('DOMContentLoaded', init);
