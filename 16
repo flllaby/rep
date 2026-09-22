@@ -1,0 +1,183 @@
+// 1. ВОПРОСЫ — урезал до 5 для примера
+const questionsData = [
+    { question: 'Столица Франции?',                   options: ['Лондон', 'Париж', 'Берлин', 'Мадрид'], correct: 1 },
+    { question: 'Сколько планет в Солнечной системе?', options: ['7', '8', '9', '10'],                  correct: 1 },
+    { question: 'Кто написал "Войну и мир"?',          options: ['Достоевский', 'Толстой', 'Пушкин', 'Чехов'], correct: 1 },
+    { question: 'Сколько дней в году?',                options: ['360', '364', '365', '366'],            correct: 2 },
+    { question: 'Самая высокая гора в мире?',          options: ['Эверест', 'Килиманджаро', 'Эльбрус', 'Монблан'], correct: 0 }
+];
+
+// 2. СОСТОЯНИЕ
+let gameState = {};
+
+// 3. DOM
+const questionText = document.getElementById('questionText');
+const optionsContainer = document.getElementById('optionsContainer');
+const feedback = document.getElementById('feedback');
+const nextBtn = document.getElementById('nextBtn');
+const quizArea = document.getElementById('quizArea');
+const resultArea = document.getElementById('resultArea');
+
+const currentQuestionSpan = document.getElementById('currentQuestion');
+const totalQuestionsSpan = document.getElementById('totalQuestions');
+const scoreSpan = document.getElementById('score');
+const correctCountSpan = document.getElementById('correctCount');
+const wrongCountSpan = document.getElementById('wrongCount');
+
+const finalCorrect = document.getElementById('finalCorrect');
+const finalWrong = document.getElementById('finalWrong');
+const finalScore = document.getElementById('finalScore');
+const restartBtn = document.getElementById('restartBtn');
+
+// 4. LOCALSTORAGE
+function save() {
+    localStorage.setItem('quizGame', JSON.stringify(gameState));
+}
+
+function load() {
+    const saved = localStorage.getItem('quizGame');
+    if (!saved) return false;
+
+    try {
+        const data = JSON.parse(saved);
+        if (data.questions && data.questions.length > 0) {
+            gameState = data;
+            return true;
+        }
+    } catch (e) {}
+    return false;
+}
+
+// 5. ПЕРЕМЕШИВАНИЕ (Fisher–Yates)
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+// 6. НОВАЯ ИГРА
+function newGame() {
+    gameState = {
+        questions: shuffle([...questionsData]),
+        current: 0,
+        score: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        answered: false
+    };
+    localStorage.removeItem('quizGame');
+    showQuestion();
+}
+
+// 7. ПОКАЗ ВОПРОСА
+function showQuestion() {
+    const q = gameState.questions[gameState.current];
+    if (!q) {
+        showResults();
+        return;
+    }
+
+    // Статистика
+    currentQuestionSpan.textContent = gameState.current + 1;
+    totalQuestionsSpan.textContent = gameState.questions.length;
+    scoreSpan.textContent = gameState.score;
+    correctCountSpan.textContent = gameState.correctCount;
+    wrongCountSpan.textContent = gameState.wrongCount;
+
+    // Вопрос
+    questionText.textContent = q.question;
+
+    // Варианты
+    optionsContainer.innerHTML = '';
+    q.options.forEach((option, index) => {
+        const btn = document.createElement('button');
+        btn.textContent = option;
+        btn.addEventListener('click', () => handleAnswer(index, btn));
+        optionsContainer.appendChild(btn);
+    });
+
+    // Сброс
+    gameState.answered = false;
+    feedback.textContent = '';
+    nextBtn.style.display = 'none';
+    resultArea.style.display = 'none';
+    quizArea.style.display = 'block';
+
+    save();
+}
+
+// 8. ОТВЕТ
+function handleAnswer(index, btn) {
+    if (gameState.answered) return;
+    gameState.answered = true;
+
+    const q = gameState.questions[gameState.current];
+    const isCorrect = index === q.correct;
+    const allBtns = optionsContainer.querySelectorAll('button');
+
+    // Блокируем и подсвечиваем правильный
+    allBtns.forEach((b, i) => {
+        b.disabled = true;
+        if (i === q.correct) b.classList.add('correct');
+    });
+
+    // Подсветка выбранного, если неправильно
+    if (!isCorrect) btn.classList.add('wrong');
+
+    // Счётчики
+    if (isCorrect) {
+        gameState.score++;
+        gameState.correctCount++;
+        feedback.textContent = '✅ Правильно!';
+    } else {
+        gameState.wrongCount++;
+        feedback.textContent = '❌ Неправильно!';
+    }
+
+    // Обновляем статистику на экране
+    scoreSpan.textContent = gameState.score;
+    correctCountSpan.textContent = gameState.correctCount;
+    wrongCountSpan.textContent = gameState.wrongCount;
+
+    nextBtn.style.display = 'block';
+    save();
+}
+
+// 9. СЛЕДУЮЩИЙ
+function nextQuestion() {
+    gameState.current++;
+    save();
+    showQuestion();
+}
+
+// 10. РЕЗУЛЬТАТЫ
+function showResults() {
+    quizArea.style.display = 'none';
+    resultArea.style.display = 'block';
+
+    finalCorrect.textContent = gameState.correctCount;
+    finalWrong.textContent = gameState.wrongCount;
+    finalScore.textContent = gameState.score;
+
+    save();
+}
+
+// 11. INIT
+function init() {
+    if (!load()) {
+        newGame();
+    } else if (gameState.current >= gameState.questions.length) {
+        // Игра была закончена — показываем результаты
+        showResults();
+    } else {
+        // Продолжаем
+        showQuestion();
+    }
+
+    nextBtn.addEventListener('click', nextQuestion);
+    restartBtn.addEventListener('click', newGame);
+}
+
+document.addEventListener('DOMContentLoaded', init);
