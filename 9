@@ -1,0 +1,127 @@
+// 1. ДАННЫЕ
+let images = [];
+const STORAGE_KEY = 'galleryImages';
+const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23ddd"/%3E%3Ctext x="100" y="110" text-anchor="middle" font-size="40" fill="%23999"%3E🖼️%3C/text%3E%3C/svg%3E';
+
+// 2. DOM
+const imageUrlInput = document.getElementById('imageUrl');
+const imageTitleInput = document.getElementById('imageTitle');
+const addBtn = document.getElementById('addBtn');
+const galleryContainer = document.getElementById('galleryContainer');
+const emptyMessage = document.getElementById('emptyMessage');
+
+// 3. LOCALSTORAGE
+function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(images));
+}
+
+function load() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) images = JSON.parse(saved);
+}
+
+// 4. РЕНДЕР
+function renderGallery() {
+    galleryContainer.innerHTML = '';
+
+    if (images.length === 0) {
+        emptyMessage.style.display = 'block';
+        galleryContainer.style.display = 'none';
+        return;
+    }
+
+    emptyMessage.style.display = 'none';
+    galleryContainer.style.display = 'grid';
+
+    images.forEach((image, index) => {
+        galleryContainer.appendChild(createCard(image, index));
+    });
+}
+
+// 5. СОЗДАНИЕ КАРТОЧКИ
+function createCard(image, index) {
+    // Контейнер
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    // Картинка
+    const img = document.createElement('img');
+    img.src = image.url;
+    img.alt = image.title;
+    img.loading = 'lazy';
+    img.onerror = function () {
+        this.src = PLACEHOLDER;
+    };
+
+    // Название
+    const title = document.createElement('span');
+    title.textContent = image.title;
+
+    // Кнопка удаления
+    const btn = document.createElement('button');
+    btn.textContent = '✕';
+    btn.addEventListener('click', () => deleteImage(index));
+
+    // Собираем
+    card.appendChild(img);
+    card.appendChild(title);
+    card.appendChild(btn);
+
+    return card;
+}
+
+// 6. ДОБАВЛЕНИЕ
+function addImage() {
+    const url = imageUrlInput.value.trim();
+    const title = imageTitleInput.value.trim();
+
+    if (!url) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        alert('Ссылка должна начинаться с http:// или https://');
+        return;
+    }
+
+    images.push({
+        url: url,
+        title: title || 'Без названия'
+    });
+
+    save();
+    renderGallery();
+
+    imageUrlInput.value = '';
+    imageTitleInput.value = '';
+    imageUrlInput.focus();
+}
+
+// 7. УДАЛЕНИЕ
+function deleteImage(index) {
+    if (!confirm('Удалить изображение?')) return;
+    images.splice(index, 1);
+    save();
+    renderGallery();
+}
+
+// 8. INIT
+function init() {
+    load();
+    renderGallery();
+
+    addBtn.addEventListener('click', addImage);
+
+    imageUrlInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            imageTitleInput.focus();
+        }
+    });
+
+    imageTitleInput.addEventListener('keypress', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addImage();
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
